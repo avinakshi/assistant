@@ -15,6 +15,8 @@ export function OverlayApp() {
   const answerDelta = useOverlayStore((s) => s.answerDelta);
   const answerDone = useOverlayStore((s) => s.answerDone);
   const answerCanceled = useOverlayStore((s) => s.answerCanceled);
+  const pushUpdater = useOverlayStore((s) => s.pushUpdater);
+  const updater = useOverlayStore((s) => s.updater);
 
   useEffect(() => {
     const api = window.ic;
@@ -27,6 +29,7 @@ export function OverlayApp() {
     const offADelta = api.onAnswerDelta((p) => answerDelta(p));
     const offADone = api.onAnswerDone((p) => answerDone(p));
     const offACanceled = api.onAnswerCanceled((p) => answerCanceled(p));
+    const offUpdater = api.onUpdaterState?.((p) => pushUpdater(p));
     return () => {
       offStats();
       offPartial();
@@ -36,6 +39,7 @@ export function OverlayApp() {
       offADelta();
       offADone();
       offACanceled();
+      offUpdater?.();
       setConnected(false);
     };
   }, [
@@ -48,6 +52,7 @@ export function OverlayApp() {
     answerDelta,
     answerDone,
     answerCanceled,
+    pushUpdater,
   ]);
 
   return (
@@ -65,11 +70,31 @@ export function OverlayApp() {
         <RmsBar />
         <TranscriptPane />
         <AnswerPane />
-        <div className="border-t border-overlay-border px-4 py-2 text-[10px] text-overlay-dim">
-          <kbd className="mx-0.5 rounded border border-overlay-border bg-white/5 px-1">Ctrl</kbd>
-          <kbd className="mx-0.5 rounded border border-overlay-border bg-white/5 px-1">Shift</kbd>
-          <kbd className="mx-0.5 rounded border border-overlay-border bg-white/5 px-1">H</kbd>
-          <span className="ml-2">hide / show</span>
+        {updater?.kind === 'downloaded' && (
+          <div className="flex items-center justify-between gap-3 border-t border-overlay-border bg-overlay-accent/10 px-4 py-2 text-[11px] text-overlay-accent">
+            <span>Update {updater.version} ready</span>
+            <button
+              type="button"
+              onClick={() => void window.ic?.updaterInstall?.()}
+              className="rounded bg-overlay-accent px-2 py-0.5 text-[11px] font-medium text-black hover:bg-overlay-accent/90"
+            >
+              Install + relaunch
+            </button>
+          </div>
+        )}
+        <div className="flex items-center justify-between border-t border-overlay-border px-4 py-2 text-[10px] text-overlay-dim">
+          <span>
+            <kbd className="mx-0.5 rounded border border-overlay-border bg-white/5 px-1">Ctrl</kbd>
+            <kbd className="mx-0.5 rounded border border-overlay-border bg-white/5 px-1">Shift</kbd>
+            <kbd className="mx-0.5 rounded border border-overlay-border bg-white/5 px-1">H</kbd>
+            <span className="ml-2">hide</span>
+          </span>
+          <span>
+            <kbd className="mx-0.5 rounded border border-overlay-border bg-white/5 px-1">Ctrl</kbd>
+            <kbd className="mx-0.5 rounded border border-overlay-border bg-white/5 px-1">Shift</kbd>
+            <kbd className="mx-0.5 rounded border border-overlay-border bg-white/5 px-1">C</kbd>
+            <span className="ml-2">screenshot</span>
+          </span>
         </div>
       </main>
     </div>

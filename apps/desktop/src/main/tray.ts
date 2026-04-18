@@ -15,6 +15,8 @@ export interface TrayDeps {
   onSignIn: () => void;
   /** Phase 6e. Clear the stored session. */
   onSignOut: () => void;
+  /** Phase 7b. Manual update check. */
+  onCheckForUpdates: () => void;
 }
 
 export interface TrayAuthState {
@@ -70,6 +72,7 @@ function rebuildMenu(): void {
   items.push(
     { type: 'separator' },
     { label: 'Open Settings\u2026', click: () => openSettingsWindow() },
+    { label: 'Check for Updates\u2026', click: deps.onCheckForUpdates },
     { type: 'separator' },
     { label: 'Quit Interview Copilot', click: deps.onQuit },
   );

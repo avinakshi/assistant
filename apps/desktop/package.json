@@ -1,6 +1,6 @@
 {
   "name": "@repo/desktop",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "private": true,
   "description": "Interview Copilot desktop app (Electron 32, main process + renderer)",
   "main": "dist/main/index.js",
@@ -20,12 +20,17 @@
     "lint": "eslint src",
     "test": "vitest run",
     "test:unit": "vitest run src",
-    "clean": "rimraf dist .turbo"
+    "clean": "rimraf dist .turbo release",
+    "dist": "pnpm run build && electron-builder --publish=never",
+    "dist:win": "pnpm run build && electron-builder --win --publish=never",
+    "dist:mac": "pnpm run build && electron-builder --mac --publish=never",
+    "release": "pnpm run build && electron-builder --publish=always"
   },
   "dependencies": {
     "@repo/audio-core": "workspace:*",
     "@repo/shared": "workspace:*",
     "clsx": "^2.1.1",
+    "electron-updater": "^6.8.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "tailwind-merge": "^2.5.2",
@@ -43,8 +48,9 @@
     "@vitejs/plugin-react": "^4.3.1",
     "autoprefixer": "^10.4.20",
     "concurrently": "^9.0.1",
-    "esbuild": "^0.24.0",
     "electron": "^32.0.0",
+    "electron-builder": "^26.8.1",
+    "esbuild": "^0.24.0",
     "jsdom": "^25.0.0",
     "postcss": "^8.4.47",
     "rimraf": "^6.0.0",

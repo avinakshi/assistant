@@ -1,0 +1,83 @@
+# electron-builder configuration. Used by `pnpm dist:win` / `pnpm dist:mac`.
+#
+# Signing: left OFF by default so `dist:*` produces an unsigned installer locally.
+# To produce a signed build, set the platform-specific env vars described in the release
+# workflow (.github/workflows/desktop-release.yml).
+
+appId: com.interviewcopilot.desktop
+productName: Interview Copilot
+copyright: Copyright © 2026 Interview Copilot
+# Electron auto-update requires the version baked into the binary to match the release
+# tag's semver. We read it from package.json — bump `version` there before tagging.
+
+# What goes into the asar archive. Everything else (workspace manifests, src/, tsconfig)
+# is excluded to keep the installer small — we already compiled to dist/.
+directories:
+  output: release
+  buildResources: resources
+asar: true
+files:
+  - dist/**/*
+  - resources/**/*
+  - package.json
+  - '!node_modules/**/{test,tests,__tests__,*.test.*,*.spec.*}'
+  - '!node_modules/**/*.md'
+  - '!node_modules/**/*.map'
+  - '!**/*.ts'
+
+extraMetadata:
+  main: dist/main/index.js
+
+# Publish to GitHub Releases under the product repo. The release CI uploads signed
+# artifacts + a latest.yml manifest; electron-updater reads from the same URL at runtime.
+publish:
+  - provider: github
+    owner: avinakshi
+    repo: assistant
+    vPrefixedTagName: true
+    releaseType: release
+
+# -------- Windows -----------------------------------------------------------
+# NSIS installer (.exe) for both architectures. x64 is the default; arm64 ships too for
+# future-proofing Copilot+ PCs.
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: resources/icon.png
+  artifactName: ${productName} Setup ${version}.${ext}
+  # Signing: configured via CSC_LINK + CSC_KEY_PASSWORD env vars in CI. Locally unsigned.
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  deleteAppDataOnUninstall: false
+  # NSIS needs a .ico at bake time. We point at the same PNG — electron-builder will
+  # generate a .ico from it if the PNG is ≥256×256.
+  installerIcon: resources/icon.png
+  uninstallerIcon: resources/icon.png
+  installerHeaderIcon: resources/icon.png
+
+# -------- macOS -------------------------------------------------------------
+# DMG (primary) + ZIP (required by electron-updater). Universal binary so one artifact
+# covers Intel + Apple Silicon.
+mac:
+  target:
+    - target: dmg
+      arch: [universal]
+    - target: zip
+      arch: [universal]
+  icon: resources/icon.png
+  category: public.app-category.productivity
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  # Entitlements: needed for Hardened Runtime + audio capture + file access.
+  entitlements: resources/entitlements.mac.plist
+  entitlementsInherit: resources/entitlements.mac.plist
+  # Signing: APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID + CSC_LINK in CI.
+  notarize: false
+
+dmg:
+  sign: false
+  artifactName: ${productName} ${version}.${ext}

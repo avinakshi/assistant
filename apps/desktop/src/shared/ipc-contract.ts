@@ -18,6 +18,10 @@ export const IpcInvokeChannels = {
   SystemOpenSettings: 'system:open-settings',
   /** Capture the screen, encode PNG, push as `screenshot` ClientMessage over the WS. */
   SystemCaptureScreenshot: 'system:capture-screenshot',
+  /** Kick off a manual update check (tray menu / settings). */
+  UpdaterCheck: 'updater:check',
+  /** User consented to install a downloaded update — relaunches. */
+  UpdaterInstall: 'updater:install',
 } as const;
 export type IpcInvokeChannel = (typeof IpcInvokeChannels)[keyof typeof IpcInvokeChannels];
 
@@ -44,6 +48,8 @@ export const IpcPushChannels = {
   AnswerDelta: 'push:answer-delta',
   AnswerDone: 'push:answer-done',
   AnswerCanceled: 'push:answer-canceled',
+  /** Auto-updater state transitions. Renderer drives the "Update ready" UI from these. */
+  UpdaterState: 'push:updater-state',
 } as const;
 export type IpcPushChannel = (typeof IpcPushChannels)[keyof typeof IpcPushChannels];
 
@@ -95,3 +101,11 @@ export interface AnswerCanceledPayload {
   readonly answerId: string;
   readonly reason: 'newer_question' | 'user_abort' | 'upstream_error';
 }
+
+export type UpdaterStatePayload =
+  | { readonly kind: 'checking' }
+  | { readonly kind: 'up-to-date' }
+  | { readonly kind: 'available'; readonly version: string }
+  | { readonly kind: 'downloading'; readonly percent: number }
+  | { readonly kind: 'downloaded'; readonly version: string }
+  | { readonly kind: 'error'; readonly message: string };

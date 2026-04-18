@@ -8,6 +8,7 @@ import type {
   SessionEventPayload,
   TranscriptFinalPayload,
   TranscriptPartialPayload,
+  UpdaterStatePayload,
 } from '../../shared/ipc-contract';
 
 export interface TranscriptFinalEntry {
@@ -35,6 +36,7 @@ interface OverlayState {
   sessionEvent: SessionEventPayload | null;
   activeAnswer: ActiveAnswer | null;
   answerHistory: ActiveAnswer[];
+  updater: UpdaterStatePayload | null;
   setConnected: (v: boolean) => void;
   pushStats: (s: EchoStatsPayload) => void;
   pushPartial: (p: TranscriptPartialPayload) => void;
@@ -44,6 +46,7 @@ interface OverlayState {
   answerDelta: (e: AnswerDeltaPayload) => void;
   answerDone: (e: AnswerDonePayload) => void;
   answerCanceled: (e: AnswerCanceledPayload) => void;
+  pushUpdater: (e: UpdaterStatePayload) => void;
 }
 
 const MAX_FINALS = 20;
@@ -57,6 +60,7 @@ export const useOverlayStore = create<OverlayState>((set) => ({
   sessionEvent: null,
   activeAnswer: null,
   answerHistory: [],
+  updater: null,
 
   setConnected: (connected) => set({ connected }),
   pushStats: (latestStats) => set({ connected: true, latestStats }),
@@ -109,4 +113,5 @@ export const useOverlayStore = create<OverlayState>((set) => ({
       if (!s.activeAnswer || s.activeAnswer.answerId !== e.answerId) return s;
       return { activeAnswer: { ...s.activeAnswer, isCanceled: true } };
     }),
+  pushUpdater: (updater) => set({ updater }),
 }));

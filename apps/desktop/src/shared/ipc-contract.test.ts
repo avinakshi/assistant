@@ -11,6 +11,8 @@ describe('ipc-contract — channel name stability', () => {
       SystemHideOverlay: 'system:hide-overlay',
       SystemOpenSettings: 'system:open-settings',
       SystemCaptureScreenshot: 'system:capture-screenshot',
+      UpdaterCheck: 'updater:check',
+      UpdaterInstall: 'updater:install',
     });
   });
 
@@ -25,13 +27,14 @@ describe('ipc-contract — channel name stability', () => {
       AnswerDelta: 'push:answer-delta',
       AnswerDone: 'push:answer-done',
       AnswerCanceled: 'push:answer-canceled',
+      UpdaterState: 'push:updater-state',
     });
   });
 
-  it('uses distinct prefixes for invoke vs push (prevents accidental cross-use)', () => {
+  it('every channel name is colon-namespaced, and invoke/push sets never overlap', () => {
     const invokeNames = Object.values(IpcInvokeChannels);
     const pushNames = Object.values(IpcPushChannels);
-    for (const name of invokeNames) expect(name.startsWith('system:')).toBe(true);
+    for (const name of invokeNames) expect(name).toMatch(/^[a-z]+:/);
     for (const name of pushNames) expect(name.startsWith('push:')).toBe(true);
     for (const n of invokeNames) expect(pushNames).not.toContain(n);
   });

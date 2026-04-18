@@ -12,6 +12,9 @@ export interface IpcDeps {
   getOverlay: () => BrowserWindow | null;
   /** The live WsClient; screenshots are forwarded over the session stream. */
   getWs: () => WsClient | null;
+  /** Phase 7b — renderer can trigger check + install via IPC. Optional for test setups. */
+  onCheckForUpdates?: () => void | Promise<void>;
+  onInstallUpdate?: () => void | Promise<void>;
 }
 
 /**
@@ -43,6 +46,14 @@ export function registerIpcHandlers(deps: IpcDeps): void {
 
   ipcMain.handle(IpcInvokeChannels.SystemCaptureScreenshot, async (): Promise<CaptureScreenshotResult> => {
     return captureAndShip(deps);
+  });
+
+  ipcMain.handle(IpcInvokeChannels.UpdaterCheck, async () => {
+    await deps.onCheckForUpdates?.();
+  });
+
+  ipcMain.handle(IpcInvokeChannels.UpdaterInstall, async () => {
+    await deps.onInstallUpdate?.();
   });
 }
 

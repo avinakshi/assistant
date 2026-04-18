@@ -9,6 +9,7 @@ import type {
   SessionEventPayload,
   TranscriptFinalPayload,
   TranscriptPartialPayload,
+  UpdaterStatePayload,
 } from '../../shared/ipc-contract';
 
 declare global {
@@ -20,6 +21,8 @@ declare global {
       hideOverlay: () => Promise<void>;
       openSettings: () => Promise<void>;
       captureScreenshot: () => Promise<CaptureScreenshotResult>;
+      updaterCheck?: () => Promise<void>;
+      updaterInstall?: () => Promise<void>;
       // Subscriptions (main → renderer). Each returns an unsubscribe fn.
       onEchoStats: (fn: (payload: EchoStatsPayload) => void) => () => void;
       onOverlayVisibility: (fn: (payload: OverlayVisibilityPayload) => void) => () => void;
@@ -30,6 +33,7 @@ declare global {
       onAnswerDelta: (fn: (payload: AnswerDeltaPayload) => void) => () => void;
       onAnswerDone: (fn: (payload: AnswerDonePayload) => void) => () => void;
       onAnswerCanceled: (fn: (payload: AnswerCanceledPayload) => void) => () => void;
+      onUpdaterState?: (fn: (payload: UpdaterStatePayload) => void) => () => void;
     };
   }
 }

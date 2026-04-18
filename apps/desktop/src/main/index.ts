@@ -176,6 +176,11 @@ async function bootstrapWithWindows(): Promise<void> {
 
   await app.whenReady();
 
+  // Start crash logging as soon as we have `app` access. Must come before any other code
+  // that might throw so we capture the failure.
+  const { initCrashReporter } = await import('./crash-reporter');
+  initCrashReporter();
+
   const { createOverlayWindow } = await import('./windows/overlay');
   const { registerIpcHandlers, broadcastToRenderers, captureAndShip } = await import(
     './ipc/index'
@@ -190,6 +195,9 @@ async function bootstrapWithWindows(): Promise<void> {
     CallbackParseError,
     CallbackAuthError,
   } = await import('./auth/login-flow');
+  const { initUpdater, checkForUpdatesNow, installAndRelaunch, shutdownUpdater } = await import(
+    './updater'
+  );
 
   const authStore = new AuthStore({ userDataDir: app.getPath('userData') });
   await authStore.load();
@@ -203,6 +211,8 @@ async function bootstrapWithWindows(): Promise<void> {
   registerIpcHandlers({
     getOverlay: () => (overlay.isDestroyed() ? null : overlay),
     getWs: () => activeWs,
+    onCheckForUpdates: () => checkForUpdatesNow(),
+    onInstallUpdate: () => installAndRelaunch(),
   });
 
   const applySessionToWs = (): void => {
@@ -277,10 +287,19 @@ async function bootstrapWithWindows(): Promise<void> {
         logger.info({}, 'signed out');
       })();
     },
+    onCheckForUpdates: () => {
+      void checkForUpdatesNow();
+    },
     onQuit: () => {
       logger.info({ reason: 'tray' }, 'quit requested');
       app.quit();
     },
+  });
+
+  // Kick off the auto-updater. No-op in dev/unpackaged builds.
+  await initUpdater({
+    broadcast: broadcastToRenderers,
+    getOverlay: () => (overlay.isDestroyed() ? null : overlay),
   });
 
   // Reflect any persisted sign-in state in the tray immediately.
@@ -334,6 +353,7 @@ async function bootstrapWithWindows(): Promise<void> {
     logger.info({}, 'before-quit: tearing down');
     unregisterAllShortcuts();
     destroyTray();
+    shutdownUpdater();
     try {
       await shutdownPipeline();
     } catch (err) {

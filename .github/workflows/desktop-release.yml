@@ -1,0 +1,85 @@
+name: Desktop Release
+
+# Fires on tag push matching v*.*.* — this is the canonical trigger. The artifacts are
+# published directly to a GitHub Release associated with the tag; electron-updater reads
+# from that same release at runtime.
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: desktop-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-14]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # The audio-core native addon is required at install time for the desktop packaging
+      # step (electron-builder copies node_modules). Build it here.
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.os == 'macos-14' && 'x86_64-apple-darwin,aarch64-apple-darwin' || '' }}
+
+      - name: Build audio-core
+        run: pnpm --filter @repo/audio-core build
+        shell: bash
+
+      - name: Build web+preload+main
+        run: pnpm --filter @repo/desktop build
+        shell: bash
+
+      - name: Package + publish (Windows)
+        if: matrix.os == 'windows-latest'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Windows code-signing. When CSC_LINK + CSC_KEY_PASSWORD are unset, electron-builder
+          # produces an unsigned .exe — fine for pre-1.0 testing; flip on for GA.
+          CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+        run: pnpm --filter @repo/desktop release
+        shell: bash
+
+      - name: Package + publish (macOS)
+        if: matrix.os == 'macos-14'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Apple signing + notarization. Leave these secrets unset to produce an
+          # unsigned (and un-notarized) DMG — DMG will still build; users will have to
+          # right-click → Open on first run. Set all four when you have an Apple
+          # Developer account:
+          #   CSC_LINK                (base64-encoded .p12)
+          #   CSC_KEY_PASSWORD        (.p12 export password)
+          #   APPLE_ID                (notarization Apple ID)
+          #   APPLE_APP_SPECIFIC_PASSWORD
+          #   APPLE_TEAM_ID
+          CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: pnpm --filter @repo/desktop release
+        shell: bash

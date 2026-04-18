@@ -21,6 +21,7 @@ import {
   type SessionEventPayload,
   type TranscriptFinalPayload,
   type TranscriptPartialPayload,
+  type UpdaterStatePayload,
 } from '../shared/ipc-contract';
 
 function subscribe<T>(channel: string, fn: (payload: T) => void): () => void {
@@ -35,9 +36,13 @@ contextBridge.exposeInMainWorld('ic', {
   hideOverlay: () => ipcRenderer.invoke(IpcInvokeChannels.SystemHideOverlay),
   openSettings: () => ipcRenderer.invoke(IpcInvokeChannels.SystemOpenSettings),
   captureScreenshot: () => ipcRenderer.invoke(IpcInvokeChannels.SystemCaptureScreenshot),
+  updaterCheck: () => ipcRenderer.invoke(IpcInvokeChannels.UpdaterCheck),
+  updaterInstall: () => ipcRenderer.invoke(IpcInvokeChannels.UpdaterInstall),
 
   onEchoStats: (fn: (p: EchoStatsPayload) => void) =>
     subscribe<EchoStatsPayload>(IpcPushChannels.EchoStats, fn),
+  onUpdaterState: (fn: (p: UpdaterStatePayload) => void) =>
+    subscribe<UpdaterStatePayload>(IpcPushChannels.UpdaterState, fn),
   onOverlayVisibility: (fn: (p: OverlayVisibilityPayload) => void) =>
     subscribe<OverlayVisibilityPayload>(IpcPushChannels.OverlayVisibility, fn),
   onTranscriptPartial: (fn: (p: TranscriptPartialPayload) => void) =>
