@@ -1,8 +1,10 @@
 'use client';
 
-import { useMemo, useState, useTransition } from 'react';
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { answerPracticeAction, endPracticeAction } from '../actions';
+import { VoiceInput } from './voice-input';
+import { speakQuestion, stopSpeaking } from '@/lib/practice/voice-client';
 
 export interface ChatEvent {
   readonly kind: string;
@@ -63,23 +65,44 @@ export function PracticeChat(props: Props) {
   const [draft, setDraft] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const [voiceMode, setVoiceMode] = useState(false);
+  const spokenQuestionsRef = useRef<Set<number>>(new Set());
 
   const turns = useMemo(() => toTurns(props.events), [props.events]);
   const lastTurn = turns[turns.length - 1];
   const awaitingAnswer = !props.ended && !!lastTurn && lastTurn.answer === undefined;
 
-  const sendAnswer = () => {
-    const text = draft.trim();
-    if (!text) return;
+  // When voice mode is on, speak each new interviewer question once. We track which
+  // indices have been spoken so React re-renders don't restart the utterance.
+  useEffect(() => {
+    if (!voiceMode) return;
+    const latest = turns[turns.length - 1];
+    if (!latest || latest.answer !== undefined) return;
+    if (spokenQuestionsRef.current.has(latest.index)) return;
+    spokenQuestionsRef.current.add(latest.index);
+    speakQuestion(latest.question);
+    return () => {
+      // Don't cancel mid-utterance on re-render — only when the component unmounts.
+    };
+  }, [turns, voiceMode]);
+
+  // Hard-stop any ongoing TTS when the component unmounts (navigation away).
+  useEffect(() => () => stopSpeaking(), []);
+
+  const submitAnswer = (text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
     setError(null);
     setDraft('');
     startTransition(() => {
-      void answerPracticeAction(props.sessionId, text).then((r) => {
+      void answerPracticeAction(props.sessionId, trimmed).then((r) => {
         if (!r.ok) setError(r.error ?? 'turn failed');
         router.refresh();
       });
     });
   };
+
+  const sendAnswer = () => submitAnswer(draft);
 
   const endNow = () => {
     setError(null);
@@ -103,6 +126,17 @@ export function PracticeChat(props: Props) {
 
       {awaitingAnswer && (
         <div className="sticky bottom-0 rounded-xl border border-ink-100 bg-white p-4 shadow-sm">
+          <div className="mb-2 flex items-center justify-end gap-2 text-xs text-ink-500">
+            <label className="flex cursor-pointer items-center gap-1.5">
+              <input
+                type="checkbox"
+                checked={voiceMode}
+                onChange={(e) => setVoiceMode(e.target.checked)}
+                className="h-3.5 w-3.5 rounded border-ink-300 text-brand-600 focus:ring-brand-500"
+              />
+              Voice mode
+            </label>
+          </div>
           <textarea
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
@@ -134,6 +168,7 @@ export function PracticeChat(props: Props) {
               </button>
             </div>
           </div>
+          {voiceMode && <VoiceInput enabled={awaitingAnswer && !pending} onSubmit={submitAnswer} />}
           {error && (
             <div className="mt-2 rounded-md border border-red-200 bg-red-50 p-2 text-xs text-red-800">
               {error}

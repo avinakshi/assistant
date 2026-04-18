@@ -64,6 +64,11 @@ export const WebEnvSchema = CommonEnvSchema.extend({
   SUPABASE_SERVICE_ROLE_KEY: optionalSecret,
   /** Base URL the web app uses to link back into the api. */
   NEXT_PUBLIC_API_BASE_URL: z.string().url().default('http://localhost:3001'),
+  /**
+   * WS URL for api — used by Phase 8b voice practice. If omitted, derived from
+   * NEXT_PUBLIC_API_BASE_URL by swapping http → ws / https → wss.
+   */
+  NEXT_PUBLIC_API_WS_URL: z.string().startsWith('ws').optional(),
 });
 export type WebEnv = z.infer<typeof WebEnvSchema>;
 

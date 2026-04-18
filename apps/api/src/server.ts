@@ -3,6 +3,7 @@ import websocketPlugin from '@fastify/websocket';
 import { config } from './config';
 import { echoRoutePlugin } from './ws/echo-handler';
 import { sessionRoutePlugin } from './ws/session-handler';
+import { practiceSttRoutePlugin } from './ws/practice-stt-handler';
 
 export async function buildServer(): Promise<FastifyInstance> {
   const app = Fastify({
@@ -32,6 +33,8 @@ export async function buildServer(): Promise<FastifyInstance> {
   // so local dev without an STT key still starts cleanly for /ws/echo + /health work.
   if (config.DEEPGRAM_API_KEY) {
     await app.register(sessionRoutePlugin);
+    // Phase 8b — practice-mode voice STT. Same key requirement.
+    await app.register(practiceSttRoutePlugin);
   }
 
   return app;
