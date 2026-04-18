@@ -46,6 +46,20 @@ export const DesktopEnvSchema = CommonEnvSchema.extend({
 export type DesktopEnv = z.infer<typeof DesktopEnvSchema>;
 
 /**
+ * Web app env. NEXT_PUBLIC_* values are exposed to the browser bundle — never put
+ * service-role keys or other secrets there.
+ */
+export const WebEnvSchema = CommonEnvSchema.extend({
+  NEXT_PUBLIC_SUPABASE_URL: z.string().url(),
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(20),
+  /** Server-side only. Used by workers + webhook handlers, never shipped to the browser. */
+  SUPABASE_SERVICE_ROLE_KEY: optionalSecret,
+  /** Base URL the web app uses to link back into the api. */
+  NEXT_PUBLIC_API_BASE_URL: z.string().url().default('http://localhost:3001'),
+});
+export type WebEnv = z.infer<typeof WebEnvSchema>;
+
+/**
  * Small helper so callers can print a friendly error instead of raw Zod dump.
  */
 export function parseOrDie<S extends z.ZodTypeAny>(
