@@ -78,6 +78,7 @@ export default async function PracticeSessionPage({
         sessionId={s.id}
         mode={s.mode}
         ended={!!s.ended_at}
+        startedAt={s.started_at}
         events={chatEvents}
         {...(summaryProp ? { summary: summaryProp } : {})}
       />

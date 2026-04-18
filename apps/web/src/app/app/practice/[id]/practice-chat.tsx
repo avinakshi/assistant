@@ -1,10 +1,12 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { answerPracticeAction, endPracticeAction } from '../actions';
 import { VoiceInput } from './voice-input';
 import { speakQuestion, stopSpeaking } from '@/lib/practice/voice-client';
+import { ExportButton } from './export-button';
 
 export interface ChatEvent {
   readonly kind: string;
@@ -30,6 +32,7 @@ interface Props {
   sessionId: string;
   mode: string;
   ended: boolean;
+  startedAt: string;
   events: readonly ChatEvent[];
   summary?: ChatSummary;
 }
@@ -123,6 +126,48 @@ export function PracticeChat(props: Props) {
       </ol>
 
       {props.summary && <SummaryCard summary={props.summary} />}
+
+      {props.ended && (
+        <>
+          <ExportButton
+            input={{
+              mode: props.mode,
+              startedAt: new Date(props.startedAt),
+              turns: turns.map((t) => {
+                const out: {
+                  index: number;
+                  question: string;
+                  answer?: string;
+                  feedback?: { scores: Record<string, number>; notes?: string };
+                } = { index: t.index, question: t.question };
+                if (t.answer !== undefined) out.answer = t.answer;
+                if (t.feedback) out.feedback = t.feedback;
+                return out;
+              }),
+              ...(props.summary
+                ? {
+                    summary: {
+                      scores: props.summary.scores,
+                      highlights: props.summary.highlights,
+                      improvements: props.summary.improvements,
+                    },
+                  }
+                : {}),
+            }}
+          />
+          <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-ink-100 bg-white p-4">
+            <div className="text-sm text-ink-700">
+              Session ended. Want to run another one?
+            </div>
+            <Link
+              href={`/app/practice?mode=${encodeURIComponent(props.mode)}`}
+              className="shrink-0 rounded bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700"
+            >
+              Start another {props.mode === 'system_design' ? 'design' : props.mode}
+            </Link>
+          </div>
+        </>
+      )}
 
       {awaitingAnswer && (
         <div className="sticky bottom-0 rounded-xl border border-ink-100 bg-white p-4 shadow-sm">
