@@ -2,6 +2,16 @@ import bannedWords from './banned-words.json';
 import { BEHAVIORAL_PROMPT, CODING_PROMPT, SYSTEM_DESIGN_PROMPT } from './packs';
 
 export { BEHAVIORAL_PROMPT, CODING_PROMPT, SYSTEM_DESIGN_PROMPT };
+export {
+  buildOpeningPrompt,
+  buildTurnPrompt,
+  buildFinalizePrompt,
+  type PracticeMode,
+  type InterviewContext,
+  type TurnHistoryEntry,
+  type BuildTurnPromptInput,
+  type BuildFinalizePromptInput,
+} from './interviewer';
 
 export type PromptPackName = 'behavioral' | 'coding' | 'system-design';
 

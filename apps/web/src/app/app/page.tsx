@@ -82,18 +82,35 @@ export default async function DashboardHome() {
         />
         <div className="rounded-xl border border-ink-100 bg-white p-6">
           <div className="text-xs font-semibold uppercase tracking-wider text-ink-500">
-            Next step
+            Warm up
           </div>
-          <div className="mt-1 text-lg font-semibold">Open the desktop app</div>
+          <div className="mt-1 text-lg font-semibold">Practice with an AI interviewer</div>
           <p className="mt-2 text-sm text-ink-700">
-            The session runs on your Mac / Windows machine, not in the browser. The signed
-            installer ships with Phase 7; for now use the dev build.
+            Behavioral, coding, or system design. You type; the AI asks follow-ups and
+            scores each answer at the end.
           </p>
-          <code className="mt-3 block rounded bg-ink-50 p-3 text-xs font-mono text-ink-700">
-            AUDIO_SOURCE=native WS_ROUTE=session \{'\n'}
-            apps/desktop/node_modules/.bin/electron apps/desktop/dist/main/index.js
-          </code>
+          <Link
+            href="/app/practice"
+            className="mt-4 inline-block rounded bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700"
+          >
+            Start practice
+          </Link>
         </div>
+      </section>
+
+      <section className="mt-8 rounded-xl border border-ink-100 bg-white p-6">
+        <div className="text-xs font-semibold uppercase tracking-wider text-ink-500">
+          Next step
+        </div>
+        <div className="mt-1 text-lg font-semibold">Open the desktop app</div>
+        <p className="mt-2 text-sm text-ink-700">
+          Live interviews run on your Mac / Windows machine, not in the browser. Grab
+          the installer from the latest GitHub Release, or use the dev build below.
+        </p>
+        <code className="mt-3 block rounded bg-ink-50 p-3 text-xs font-mono text-ink-700">
+          AUDIO_SOURCE=native WS_ROUTE=session \{'\n'}
+          apps/desktop/node_modules/.bin/electron apps/desktop/dist/main/index.js
+        </code>
       </section>
     </div>
   );

@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@google/generative-ai": "^0.21.0",
+    "@repo/prompts": "workspace:*",
     "@repo/shared": "workspace:*",
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.45.4",
