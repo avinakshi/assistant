@@ -36,6 +36,12 @@ export const ApiEnvSchema = CommonEnvSchema.extend({
   CLAUDE_MODEL: z.string().default('claude-haiku-4-5-20251001'),
   // OCR (Phase 5). Optional — /api/ocr/coding-problem returns 503 if unset.
   GOOGLE_CLOUD_VISION_KEY: optionalSecret,
+  // Phase 6f. When both are set, the /ws/session route verifies Supabase JWTs from the
+  // token query param, writes session lifecycle rows to the DB, and enforces per-plan
+  // weekly usage quotas. When either is unset the route falls back to WS_SHARED_SECRET
+  // auth and skips quota checks — useful for CI and pre-Supabase local dev.
+  SUPABASE_URL: z.string().url().optional(),
+  SUPABASE_SERVICE_ROLE_KEY: optionalSecret,
 });
 export type ApiEnv = z.infer<typeof ApiEnvSchema>;
 

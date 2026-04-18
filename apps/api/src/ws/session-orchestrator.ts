@@ -13,6 +13,7 @@ import crypto from 'node:crypto';
 import type { WebSocket } from '@fastify/websocket';
 import type { RawData } from 'ws';
 import type { FastifyBaseLogger } from 'fastify';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   AUDIO_BYTES_PER_FRAME,
   AUDIO_SAMPLE_RATE_HZ,
@@ -29,6 +30,7 @@ import type { SttSession } from '../providers/stt/provider';
 import { SttRouter } from '../providers/stt/router';
 import type { OcrCache } from '../lib/ocr-cache';
 import type { RateLimiter } from '../lib/rate-limiter';
+import { checkQuota, formatSeconds } from '../lib/usage';
 
 export interface SessionOrchestratorDeps {
   router: SttRouter;
@@ -41,6 +43,16 @@ export interface SessionOrchestratorDeps {
   ocrRateLimiter?: RateLimiter;
   /** User tier (Phase 4a: ignored, everyone gets Gemini). */
   tier?: Tier;
+  /**
+   * Phase 6f. When set, the orchestrator writes a row to `sessions` on start, updates
+   * `ended_at` + `duration_s` on stop, and enforces the user's plan quota before letting
+   * the STT stream open.
+   *
+   * When null/undefined, the orchestrator runs in legacy shared-secret mode — no DB
+   * writes, no quota gate. Used by integration tests.
+   */
+  userId?: string;
+  supabase?: SupabaseClient;
 }
 
 type State = 'awaiting-start' | 'starting' | 'active' | 'stopping' | 'closed';
@@ -63,6 +75,10 @@ export class SessionOrchestrator {
   private language = 'en';
   private llmChoice: 'auto' | 'claude' | 'gpt-5' | 'gpt-4.1' | 'gemini' = 'auto';
   private currentAnswer: ActiveAnswer | null = null;
+  /** Wall-clock ms of when STT opened successfully — used to compute duration on stop. */
+  private sessionStartedAtMs: number | null = null;
+  /** DB row id (sessions.id) for the active row, if any was inserted. */
+  private dbSessionId: string | null = null;
   /**
    * Latest OCR-parsed coding problem. Attached to the next answer's context so the LLM
    * sees the structured problem alongside the interviewer's question. Cleared when a new
@@ -132,6 +148,36 @@ export class SessionOrchestrator {
       'session starting',
     );
 
+    // Phase 6f: if we know who the user is, gate on their weekly quota before opening
+    // STT. Failing here emits QUOTA_EXCEEDED and closes — nothing allocated upstream.
+    let secondsAvailable = 0;
+    if (this.deps.userId && this.deps.supabase) {
+      try {
+        const quota = await checkQuota(this.deps.supabase, this.deps.userId);
+        if (!quota.allowed) {
+          const used = quota.snapshot.usedSeconds;
+          const limit = quota.snapshot.weeklyLimitSeconds ?? 0;
+          this.deps.logger.info(
+            { userId: this.deps.userId, plan: quota.snapshot.plan, used, limit },
+            'quota denied',
+          );
+          this.send({
+            type: 'error',
+            code: 'QUOTA_EXCEEDED',
+            message: `Weekly ${quota.snapshot.plan} quota exhausted (${formatSeconds(used)} / ${formatSeconds(limit)}). Upgrade to continue.`,
+          });
+          await this.stop();
+          return;
+        }
+        secondsAvailable = quota.snapshot.remainingSeconds ?? 0;
+      } catch (err) {
+        // A quota check failure must NOT silently let the user through on an unbounded
+        // plan — but it also shouldn't hard-fail the live flow over a transient DB blip.
+        // Log loudly and treat as allowed with 0 advertised seconds.
+        this.deps.logger.warn({ err: String(err) }, 'quota check failed — letting through');
+      }
+    }
+
     try {
       this.stt = await this.deps.router.connect({
         language: msg.language,
@@ -157,8 +203,39 @@ export class SessionOrchestrator {
       return;
     }
 
+    this.sessionStartedAtMs = Date.now();
+
+    // Write the sessions row now that STT is actually open — prevents orphans from
+    // connections that die during STT handshake.
+    if (this.deps.userId && this.deps.supabase) {
+      try {
+        const { data, error } = await this.deps.supabase
+          .from('sessions')
+          .insert({
+            user_id: this.deps.userId,
+            kind: 'live',
+            mode: msg.mode,
+            language: msg.language,
+            llm_choice: msg.llm,
+            ...(msg.resumeId ? { resume_id: msg.resumeId } : {}),
+            ...(msg.jdId ? { jd_id: msg.jdId } : {}),
+            ...(msg.personaId ? { persona_id: msg.personaId } : {}),
+          })
+          .select('id')
+          .single();
+        if (error) throw error;
+        const row = data as { id: string } | null;
+        if (row) this.dbSessionId = row.id;
+      } catch (err) {
+        // Don't fail the session over a DB write — the user's already talking. Losing a
+        // row means we won't count these minutes against quota, which is bad, but so is
+        // cutting off a live interview over a migration issue.
+        this.deps.logger.warn({ err: String(err) }, 'sessions insert failed');
+      }
+    }
+
     this.state = 'active';
-    this.send({ type: 'session.ready', sessionId: this.sessionId, secondsAvailable: 0 });
+    this.send({ type: 'session.ready', sessionId: this.sessionId, secondsAvailable });
   }
 
   private handleBinary(frame: Buffer): void {
@@ -434,6 +511,29 @@ export class SessionOrchestrator {
       }
       this.stt = null;
     }
+
+    // Phase 6f: seal the DB row with the measured duration. Done regardless of whether
+    // the socket was still open — a dropped connection still consumed minutes.
+    if (this.dbSessionId && this.deps.supabase && this.sessionStartedAtMs !== null) {
+      const durationS = Math.max(0, Math.round((Date.now() - this.sessionStartedAtMs) / 1_000));
+      try {
+        const { error } = await this.deps.supabase
+          .from('sessions')
+          .update({ ended_at: new Date().toISOString(), duration_s: durationS })
+          .eq('id', this.dbSessionId);
+        if (error) throw error;
+        this.deps.logger.info(
+          { sessionId: this.sessionId, dbSessionId: this.dbSessionId, durationS },
+          'session row sealed',
+        );
+      } catch (err) {
+        this.deps.logger.warn(
+          { err: String(err), dbSessionId: this.dbSessionId },
+          'sessions update failed',
+        );
+      }
+    }
+
     if (this.socket.readyState === this.socket.OPEN) {
       this.socket.close(1000, 'session stopped');
     }

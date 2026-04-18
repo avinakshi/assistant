@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
+import { formatMinutes, planDisplayName, readUsageSnapshot } from '@/lib/usage';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,7 +11,7 @@ export default async function DashboardHome() {
   } = await supabase.auth.getUser();
   const firstName = (user?.user_metadata?.full_name as string | undefined)?.split(' ')[0];
 
-  const [{ data: resumes }, { data: jds }, { data: personas }] = await Promise.all([
+  const [{ data: resumes }, { data: jds }, { data: personas }, usage] = await Promise.all([
     supabase.from('resumes').select('id, name, is_default').order('created_at', { ascending: false }),
     supabase
       .from('job_descriptions')
@@ -21,17 +22,26 @@ export default async function DashboardHome() {
       .from('personas')
       .select('id, name, is_default')
       .order('created_at', { ascending: false }),
+    readUsageSnapshot(supabase),
   ]);
 
   const defaultResume = resumes?.find((r) => r.is_default) ?? resumes?.[0];
   const defaultPersona = personas?.find((p) => p.is_default);
+
+  const planLabel = planDisplayName(usage.plan);
+  const usageHeader =
+    usage.weeklyLimitSeconds === null
+      ? `${planLabel} tier \u00b7 unlimited live minutes`
+      : `${planLabel} tier \u00b7 ${formatMinutes(usage.usedSeconds)} used of ${formatMinutes(usage.weeklyLimitSeconds)} this week`;
 
   return (
     <div className="mx-auto max-w-4xl px-6 py-10">
       <h1 className="text-2xl font-semibold">
         Welcome{firstName ? `, ${firstName}` : ''}.
       </h1>
-      <p className="mt-1 text-sm text-ink-500">Free tier · 10 live minutes / week</p>
+      <p className="mt-1 text-sm text-ink-500">{usageHeader}</p>
+
+      <UsageCard usage={usage} />
 
       <section className="mt-8 grid gap-4 md:grid-cols-2">
         <SetupCard
@@ -85,6 +95,51 @@ export default async function DashboardHome() {
           </code>
         </div>
       </section>
+    </div>
+  );
+}
+
+function UsageCard({ usage }: { usage: Awaited<ReturnType<typeof readUsageSnapshot>> }) {
+  const unlimited = usage.weeklyLimitSeconds === null;
+  const pct = unlimited
+    ? 0
+    : Math.min(100, Math.round((usage.usedSeconds / (usage.weeklyLimitSeconds || 1)) * 100));
+  const bar =
+    pct >= 100 ? 'bg-red-500' : pct >= 80 ? 'bg-amber-500' : 'bg-brand-500';
+  return (
+    <div className="mt-6 rounded-xl border border-ink-100 bg-white p-5">
+      <div className="flex items-center justify-between">
+        <div className="text-xs font-semibold uppercase tracking-wider text-ink-500">
+          This week\u2019s live usage
+        </div>
+        <Link
+          href="/app/billing"
+          className="text-xs font-medium text-brand-600 hover:underline"
+        >
+          {unlimited ? 'View plan' : 'Upgrade'}
+        </Link>
+      </div>
+      {unlimited ? (
+        <div className="mt-3 text-sm text-ink-700">
+          You\u2019re on {planDisplayName(usage.plan)}. No weekly cap\u2014 run as many sessions as you need.
+        </div>
+      ) : (
+        <>
+          <div className="mt-3 text-sm text-ink-700">
+            {formatMinutes(usage.usedSeconds)} used \u00b7{' '}
+            {formatMinutes(usage.remainingSeconds ?? 0)} remaining
+          </div>
+          <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-ink-50">
+            <div className={`h-full ${bar}`} style={{ width: `${pct}%` }} />
+          </div>
+          {pct >= 100 && (
+            <div className="mt-3 rounded border border-red-200 bg-red-50 p-3 text-xs text-red-800">
+              Weekly quota exhausted. New sessions are blocked until the rolling window
+              clears, or upgrade to keep going.
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }

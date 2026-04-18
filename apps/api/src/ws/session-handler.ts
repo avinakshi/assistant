@@ -25,6 +25,8 @@ import { DeepgramProvider } from '../providers/stt/deepgram';
 import { AssemblyAIProvider } from '../providers/stt/assemblyai';
 import { SttRouter } from '../providers/stt/router';
 import { SessionOrchestrator } from './session-orchestrator';
+import { authenticateWsToken } from './auth';
+import { getSupabaseAdmin } from '../lib/supabase';
 import { encodeServerMessage } from '@repo/shared';
 
 export const sessionRoutePlugin: FastifyPluginAsync = async (app: FastifyInstance) => {
@@ -35,11 +37,12 @@ export const sessionRoutePlugin: FastifyPluginAsync = async (app: FastifyInstanc
   const ocrCache = new InMemoryOcrCache();
 
   // @ts-expect-error — @fastify/websocket@11.2.0 + Fastify 5 type-merge bug, same as /ws/echo.
-  app.get('/ws/session', { websocket: true }, (socket: WebSocket, req: FastifyRequest) => {
+  app.get('/ws/session', { websocket: true }, async (socket: WebSocket, req: FastifyRequest) => {
     const url = new URL(req.url, `http://${req.headers.host ?? 'localhost'}`);
     const token = url.searchParams.get('token');
-    if (token !== config.WS_SHARED_SECRET) {
-      logger.warn({ ip: req.ip }, 'session auth failed');
+    const auth = await authenticateWsToken(token);
+    if (auth.kind === 'denied') {
+      logger.warn({ ip: req.ip, reason: auth.reason }, 'session auth failed');
       try {
         socket.send(encodeServerMessage({ type: 'error', code: 'AUTH', message: 'bad token' }));
       } catch {
@@ -50,7 +53,12 @@ export const sessionRoutePlugin: FastifyPluginAsync = async (app: FastifyInstanc
     }
     const log = logger.child({ route: '/ws/session', ip: req.ip });
     log.info(
-      { llm: llmRouter ? 'enabled' : 'disabled', ocr: ocrProvider ? 'enabled' : 'disabled' },
+      {
+        llm: llmRouter ? 'enabled' : 'disabled',
+        ocr: ocrProvider ? 'enabled' : 'disabled',
+        authMode: auth.kind,
+        userId: auth.kind === 'user' ? auth.userId : undefined,
+      },
       'session opened',
     );
     const deps: ConstructorParameters<typeof SessionOrchestrator>[1] = {
@@ -63,6 +71,13 @@ export const sessionRoutePlugin: FastifyPluginAsync = async (app: FastifyInstanc
       deps.ocrCache = ocrCache;
       // Per-connection rate limit — 10 screenshots / minute per the spec.
       deps.ocrRateLimiter = new SlidingWindowLimiter(10, 60_000);
+    }
+    if (auth.kind === 'user') {
+      const supabase = getSupabaseAdmin();
+      if (supabase) {
+        deps.userId = auth.userId;
+        deps.supabase = supabase;
+      }
     }
     new SessionOrchestrator(socket, deps);
   });
