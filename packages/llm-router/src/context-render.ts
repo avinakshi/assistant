@@ -74,6 +74,23 @@ export function buildUserMessage(ctx: AnswerContext, includeStaticBlocks: boolea
   if (ctx.transcriptWindow && ctx.transcriptWindow.length > 0) {
     parts.push(`<transcript_last_90s>\n${ctx.transcriptWindow.trim()}\n</transcript_last_90s>`);
   }
+  if (ctx.priorTurn) {
+    // Anchor for follow-ups. Trimmed so the cached-system-block key stays stable even
+    // when a turn carries trailing whitespace from live STT.
+    parts.push(
+      [
+        '<prior_turn>',
+        '  <q>',
+        indent(ctx.priorTurn.question.trim(), 4),
+        '  </q>',
+        '  <a>',
+        indent(ctx.priorTurn.answer.trim(), 4),
+        '  </a>',
+        '  <note>If this question is a follow-up ("Why?", "What was the outcome?", "Can you elaborate?"), continue the SAME story. Do not invent a new one.</note>',
+        '</prior_turn>',
+      ].join('\n'),
+    );
+  }
   if (ctx.codingProblem) {
     parts.push(renderCodingProblem(ctx.codingProblem));
   }

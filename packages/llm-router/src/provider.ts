@@ -57,6 +57,19 @@ export interface AnswerContext {
    * title, description, examples, and constraints verbatim.
    */
   codingProblem?: CodingProblemLike;
+  /**
+   * The most recently completed Q/A pair, if any. Present so follow-up questions like
+   * "What was the outcome?" or "Why?" have an anchor — without it the LLM hallucinates
+   * a fresh story and the follow-up reads as incoherent.
+   *
+   * The orchestrator sets this before calling `startStream`; it's cleared when a newer
+   * full-scope question arrives (detected by length + lack of follow-up markers) so
+   * unrelated questions don't get dragged into each other's context.
+   */
+  priorTurn?: {
+    readonly question: string;
+    readonly answer: string;
+  };
 }
 
 export interface StreamOptions {

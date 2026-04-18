@@ -134,11 +134,12 @@ async function bootstrapPipeline(
   const pipeline = new AudioPipeline(source, ws);
   await pipeline.start();
 
-  if (WS_ROUTE === 'session') {
-    // Kick off the session immediately. Phase 6 moves this behind an explicit user action
-    // (hotkey Ctrl+Shift+S / tray button) once sessions have usage quotas.
-    ws.startSession({ language: SESSION_LANGUAGE, mode: 'auto', llm: 'auto' });
-  }
+  // Do NOT auto-start the session. In Phase 4 the pipeline opened STT + the LLM on boot,
+  // which meant any system audio (music, meetings, cricket commentary on another tab) ran
+  // through Deepgram and could trigger Gemini calls. Live testing confirmed this burned
+  // quota on background chatter. Users now press Ctrl+Shift+S (or the tray item) to start
+  // listening. Frames still flow to the api in the meantime but are dropped server-side
+  // until `session.start` arrives.
 
   return {
     pipeline,
@@ -185,7 +186,9 @@ async function bootstrapWithWindows(): Promise<void> {
   const { registerIpcHandlers, broadcastToRenderers, captureAndShip } = await import(
     './ipc/index'
   );
-  const { setupTray, destroyTray, updateTrayAuth } = await import('./tray');
+  const { setupTray, destroyTray, updateTrayAuth, updateTrayListening } = await import(
+    './tray'
+  );
   const { registerGlobalShortcuts, unregisterAllShortcuts } = await import('./shortcuts');
   const { AuthStore } = await import('./auth/auth-store');
   const {
@@ -228,6 +231,41 @@ async function bootstrapWithWindows(): Promise<void> {
       sess ? { signedIn: true, ...(sess.email ? { email: sess.email } : {}) } : { signedIn: false },
     );
   };
+
+  // Listening state. False by default — the session is NOT live until the user explicitly
+  // starts it (Ctrl+Shift+S or tray). This prevents background audio from burning LLM
+  // quota; see commit history for the live-test incident that drove this.
+  let isListening = false;
+
+  const setListening = (next: boolean): void => {
+    if (next === isListening) return;
+    if (WS_ROUTE !== 'session') {
+      // Echo route ignores session toggles — keep the flag in sync but don't touch the WS.
+      isListening = next;
+      return;
+    }
+    if (!activeWs) {
+      logger.warn({}, 'toggleListening fired before WS ready — ignoring');
+      return;
+    }
+    if (next) {
+      activeWs.startSession({ language: SESSION_LANGUAGE, mode: 'auto', llm: 'auto' });
+      logger.info({}, 'listening started');
+      broadcastToRenderers(IpcPushChannels.SessionEvent, {
+        kind: 'listening',
+      } satisfies SessionEventPayload);
+    } else {
+      activeWs.stopSession();
+      logger.info({}, 'listening stopped');
+      broadcastToRenderers(IpcPushChannels.SessionEvent, {
+        kind: 'idle',
+      } satisfies SessionEventPayload);
+    }
+    isListening = next;
+    updateTrayListening(next);
+  };
+
+  const toggleListening = (): void => setListening(!isListening);
 
   const handleDeepLink = async (rawUrl: string): Promise<void> => {
     if (!rawUrl.startsWith('ic://')) return;
@@ -296,6 +334,7 @@ async function bootstrapWithWindows(): Promise<void> {
     onCheckForUpdates: () => {
       void checkForUpdatesNow();
     },
+    onToggleListening: () => toggleListening(),
     onQuit: () => {
       logger.info({ reason: 'tray' }, 'quit requested');
       app.quit();
@@ -328,7 +367,7 @@ async function bootstrapWithWindows(): Promise<void> {
       }
     },
     startStopSession: () => {
-      logger.info({}, 'Ctrl+Shift+S — session toggle (Phase 6 binds user action)');
+      toggleListening();
     },
     quit: () => {
       logger.info({ reason: 'shortcut' }, 'quit requested');
@@ -350,6 +389,12 @@ async function bootstrapWithWindows(): Promise<void> {
   });
   // If we already had a saved session on disk, push its access token into the WS now.
   applySessionToWs();
+  // Announce the initial idle state so the overlay renders the "Press Ctrl+Shift+S to
+  // start listening" hint instead of flashing an empty transcript pane.
+  broadcastToRenderers(IpcPushChannels.SessionEvent, {
+    kind: 'idle',
+  } satisfies SessionEventPayload);
+  updateTrayListening(false);
 
   app.on('window-all-closed', () => {
     // Tray-resident: do NOT quit. User explicitly quits via tray menu or Ctrl+Shift+Q.

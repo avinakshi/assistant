@@ -17,6 +17,8 @@ export function OverlayApp() {
   const answerCanceled = useOverlayStore((s) => s.answerCanceled);
   const pushUpdater = useOverlayStore((s) => s.pushUpdater);
   const updater = useOverlayStore((s) => s.updater);
+  const sessionEvent = useOverlayStore((s) => s.sessionEvent);
+  const listening = sessionEvent?.kind === 'listening' || sessionEvent?.kind === 'ready';
 
   useEffect(() => {
     const api = window.ic;
@@ -62,14 +64,25 @@ export function OverlayApp() {
         style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
       >
         <span>interview copilot · overlay</span>
-        <span className={connected ? 'text-overlay-accent' : 'text-overlay-dim'}>
-          {connected ? 'linked' : 'idle'}
+        <span className={listening ? 'text-overlay-accent' : 'text-overlay-dim'}>
+          {listening ? 'listening' : connected ? 'idle · press Ctrl+Shift+S' : 'disconnected'}
         </span>
       </header>
       <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <RmsBar />
         <TranscriptPane />
         <AnswerPane />
+        {!listening && (
+          <div className="flex items-center justify-center border-t border-overlay-border bg-white/[0.02] px-4 py-3 text-[11px] text-overlay-dim">
+            <span>
+              Press{' '}
+              <kbd className="mx-0.5 rounded border border-overlay-border bg-white/5 px-1">Ctrl</kbd>
+              <kbd className="mx-0.5 rounded border border-overlay-border bg-white/5 px-1">Shift</kbd>
+              <kbd className="mx-0.5 rounded border border-overlay-border bg-white/5 px-1">S</kbd>{' '}
+              to start listening
+            </span>
+          </div>
+        )}
         {updater?.kind === 'downloaded' && (
           <div className="flex items-center justify-between gap-3 border-t border-overlay-border bg-overlay-accent/10 px-4 py-2 text-[11px] text-overlay-accent">
             <span>Update {updater.version} ready</span>

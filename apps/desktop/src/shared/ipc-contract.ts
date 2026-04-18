@@ -76,7 +76,14 @@ export interface TranscriptFinalPayload {
 }
 
 export interface SessionEventPayload {
-  readonly kind: 'ready' | 'quota-exceeded' | 'stt-error' | 'auth-failed' | 'disconnected';
+  readonly kind:
+    | 'ready'
+    | 'quota-exceeded'
+    | 'stt-error'
+    | 'auth-failed'
+    | 'disconnected'
+    | 'listening' // user pressed Ctrl+Shift+S and STT is actively open
+    | 'idle'; // stopped or never started — no Deepgram / no LLM calls
   readonly message?: string;
 }
 

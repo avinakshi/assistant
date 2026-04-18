@@ -85,6 +85,16 @@ export class SessionOrchestrator {
    * coding problem arrives (always the most-recent).
    */
   private codingProblem: CodingProblem | null = null;
+  /**
+   * The last completed (question, answer) pair. Threaded into the next AnswerContext so
+   * follow-ups like "What was the outcome?" or "Why?" don't hallucinate a fresh story.
+   * Cleared when a sufficiently different question arrives (see isFollowUp).
+   */
+  private priorTurn: { question: string; answer: string } | null = null;
+  /** Accumulator for the currently-streaming answer. Copied into priorTurn on done. */
+  private currentAnswerText = '';
+  /** The question text the active answer is responding to. */
+  private currentAnswerQuestion = '';
 
   constructor(
     private readonly socket: WebSocket,
@@ -295,6 +305,12 @@ export class SessionOrchestrator {
       this.currentAnswer = null;
     }
 
+    // Decide whether the prior turn is still relevant context. Follow-ups like "why?",
+    // "what was the outcome?", "can you elaborate?" should stay anchored; genuinely new
+    // questions should not drag the last story along (keeps prompt cost bounded too).
+    const priorTurnForContext =
+      this.priorTurn && isFollowUp(question) ? this.priorTurn : undefined;
+
     const answerId = crypto.randomUUID();
     const abort = new AbortController();
     const answer: ActiveAnswer = {
@@ -305,6 +321,8 @@ export class SessionOrchestrator {
       totalChars: 0,
     };
     this.currentAnswer = answer;
+    this.currentAnswerText = '';
+    this.currentAnswerQuestion = question;
 
     let provider = 'unknown';
     try {
@@ -318,6 +336,7 @@ export class SessionOrchestrator {
           language: this.language,
           hint: effectiveHint,
           ...(this.codingProblem ? { codingProblem: this.codingProblem } : {}),
+          ...(priorTurnForContext ? { priorTurn: priorTurnForContext } : {}),
         },
         signal: abort.signal,
       });
@@ -333,6 +352,7 @@ export class SessionOrchestrator {
         if (abort.signal.aborted) break;
         if (answer.firstTokenAt === null) answer.firstTokenAt = Date.now();
         answer.totalChars += delta.length;
+        this.currentAnswerText += delta;
         this.send({ type: 'answer.delta', answerId, text: delta });
       }
 
@@ -354,6 +374,13 @@ export class SessionOrchestrator {
           },
           'answer done',
         );
+        // Commit the completed turn so the next follow-up has an anchor.
+        if (this.currentAnswerText.length > 0) {
+          this.priorTurn = {
+            question: this.currentAnswerQuestion,
+            answer: this.currentAnswerText,
+          };
+        }
       }
     } catch (err) {
       if (abort.signal.aborted) {
@@ -549,4 +576,48 @@ function toBuffer(data: RawData): Buffer {
 
 function bufferToString(data: RawData): string {
   return toBuffer(data).toString('utf8');
+}
+
+/**
+ * Heuristic: is this question a follow-up to the previous turn, or a fresh topic?
+ *
+ * We keep the prior Q/A threaded into the LLM context only for follow-ups — otherwise
+ * every subsequent question pays the token cost of the entire previous answer, and
+ * unrelated topics get forced to reference each other.
+ *
+ * A question is treated as a follow-up if ANY of:
+ *   - very short (≤ 4 words) — "why?", "how so?", "and then?"
+ *   - starts with a bare connector — "and", "so", "but", "or", "plus"
+ *   - matches common continuation phrases — "what was the outcome", "tell me more",
+ *     "can you elaborate", "go on", "expand on that", "what happened next"
+ *
+ * Exported for unit tests.
+ */
+export function isFollowUp(question: string): boolean {
+  const q = question.trim().toLowerCase().replace(/[?.!]+$/, '');
+  if (q.length === 0) return false;
+
+  const words = q.split(/\s+/).filter((w) => w.length > 0);
+  if (words.length <= 4) return true;
+
+  if (/^(and|so|but|or|plus|also|then)\b/.test(q)) return true;
+
+  const CONTINUATION = [
+    'what was the outcome',
+    'tell me more',
+    'can you elaborate',
+    'could you elaborate',
+    'go on',
+    'expand on that',
+    'what happened next',
+    'what happened after',
+    'and then',
+    'why is that',
+    'why do you say',
+    'say more about',
+  ];
+  for (const c of CONTINUATION) {
+    if (q.includes(c)) return true;
+  }
+  return false;
 }

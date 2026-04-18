@@ -6,6 +6,7 @@ import { openSettingsWindow } from './windows/settings';
 let tray: Tray | null = null;
 let activeDeps: TrayDeps | null = null;
 let authState: TrayAuthState = { signedIn: false };
+let listeningState = false;
 
 export interface TrayDeps {
   onShowOverlay: () => void;
@@ -17,6 +18,8 @@ export interface TrayDeps {
   onSignOut: () => void;
   /** Phase 7b. Manual update check. */
   onCheckForUpdates: () => void;
+  /** Toggle the live listening state (start/stop Deepgram + LLM). */
+  onToggleListening: () => void;
 }
 
 export interface TrayAuthState {
@@ -53,10 +56,22 @@ export function updateTrayAuth(state: TrayAuthState): void {
   rebuildMenu();
 }
 
+/** Call whenever listening is toggled so the tray label flips and the tooltip updates. */
+export function updateTrayListening(active: boolean): void {
+  listeningState = active;
+  if (tray) tray.setToolTip(`Interview Copilot — ${active ? 'listening' : 'idle'}`);
+  rebuildMenu();
+}
+
 function rebuildMenu(): void {
   if (!tray || !activeDeps) return;
   const deps = activeDeps;
   const items: Electron.MenuItemConstructorOptions[] = [
+    {
+      label: listeningState ? 'Stop Listening (Ctrl+Shift+S)' : 'Start Listening (Ctrl+Shift+S)',
+      click: deps.onToggleListening,
+    },
+    { type: 'separator' },
     { label: 'Show Overlay', click: deps.onShowOverlay },
     { label: 'Hide Overlay', click: deps.onHideOverlay },
     { type: 'separator' },
