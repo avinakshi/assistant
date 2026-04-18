@@ -143,7 +143,9 @@ impl MemDc {
 }
 impl Drop for MemDc {
     fn drop(&mut self) {
-        unsafe { let _ = DeleteDC(self.hdc); };
+        unsafe {
+            let _ = DeleteDC(self.hdc);
+        };
     }
 }
 
@@ -162,6 +164,8 @@ impl DibBitmap {
 }
 impl Drop for DibBitmap {
     fn drop(&mut self) {
-        unsafe { let _ = DeleteObject(self.hbmp); };
+        unsafe {
+            let _ = DeleteObject(self.hbmp);
+        };
     }
 }

@@ -44,8 +44,7 @@ const AUDCLNT_BUFFERFLAG_SILENT_BIT: u32 = 0x0000_0002;
 /// KSDATAFORMAT_SUBTYPE_* — WAVEFORMATEXTENSIBLE subformat GUIDs.
 const KSDATAFORMAT_SUBTYPE_IEEE_FLOAT: GUID =
     GUID::from_u128(0x0000_0003_0000_0010_8000_00AA_00389B71);
-const KSDATAFORMAT_SUBTYPE_PCM: GUID =
-    GUID::from_u128(0x0000_0001_0000_0010_8000_00AA_00389B71);
+const KSDATAFORMAT_SUBTYPE_PCM: GUID = GUID::from_u128(0x0000_0001_0000_0010_8000_00AA_00389B71);
 
 pub struct WindowsLoopbackCapture {
     stop_flag: Arc<AtomicBool>,
@@ -225,7 +224,11 @@ fn capture_loop_inner(
                         .map_err(|e| AudioError::Wasapi(format!("ReleaseBuffer: {e}")))?;
                 }
 
-                resampler.push(&mono_buf, now_ns().saturating_sub(start_ns), &mut pending_frames)?;
+                resampler.push(
+                    &mono_buf,
+                    now_ns().saturating_sub(start_ns),
+                    &mut pending_frames,
+                )?;
                 for frame in pending_frames.drain(..) {
                     if frame_tx.send(frame).is_err() {
                         return Ok(()); // receiver dropped — graceful exit
@@ -288,7 +291,9 @@ fn detect_format(_fmt: &WAVEFORMATEX, ptr: *const WAVEFORMATEX) -> Result<Format
                 )))
             }
         }
-        other => Err(AudioError::UnsupportedFormat(format!("format tag {other:#x}"))),
+        other => Err(AudioError::UnsupportedFormat(format!(
+            "format tag {other:#x}"
+        ))),
     }
 }
 

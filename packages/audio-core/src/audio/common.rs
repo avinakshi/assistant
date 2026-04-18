@@ -1,7 +1,9 @@
 //! Shared audio types + resampler. Platform-agnostic.
 
 use crate::error::AudioError;
-use rubato::{Resampler, SincFixedIn, SincInterpolationParameters, SincInterpolationType, WindowFunction};
+use rubato::{
+    Resampler, SincFixedIn, SincInterpolationParameters, SincInterpolationType, WindowFunction,
+};
 
 /// Target output contract. See docs/INTERVIEW-COPILOT-COMPLETE.txt §04 ARCHITECTURE Part 2.
 pub const OUTPUT_SAMPLE_RATE_HZ: u32 = 16_000;
@@ -153,12 +155,17 @@ mod tests {
         let measurement_end = out.len().saturating_sub(1) * OUTPUT_SAMPLES_PER_FRAME;
         let total_samples: Vec<f32> = out
             .iter()
-            .flat_map(|f| f.samples.iter().map(|&s| f32::from(s) / f32::from(i16::MAX)))
+            .flat_map(|f| {
+                f.samples
+                    .iter()
+                    .map(|&s| f32::from(s) / f32::from(i16::MAX))
+            })
             .skip(measurement_start)
             .take(measurement_end.saturating_sub(measurement_start))
             .collect();
         assert!(!total_samples.is_empty(), "no measurement window");
-        let rms = (total_samples.iter().map(|s| s * s).sum::<f32>() / total_samples.len() as f32).sqrt();
+        let rms =
+            (total_samples.iter().map(|s| s * s).sum::<f32>() / total_samples.len() as f32).sqrt();
         let expected = amp / 2.0_f32.sqrt();
         let ratio_db = 20.0 * (rms / expected).log10();
         assert!(

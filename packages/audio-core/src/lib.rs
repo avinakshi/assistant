@@ -231,9 +231,10 @@ pub async fn request_screen_recording_permission() -> Result<String> {
     }
     #[cfg(target_os = "macos")]
     {
-        return Err(
-            AudioError::Other("screen recording permission check lands with Mac impl".into()).into(),
-        );
+        return Err(AudioError::Other(
+            "screen recording permission check lands with Mac impl".into(),
+        )
+        .into());
     }
     #[cfg(not(any(target_os = "windows", target_os = "macos")))]
     {
