@@ -152,9 +152,27 @@ async function bootstrapPipeline(
 
 async function bootstrapWithWindows(): Promise<void> {
   const electron = await import('electron');
-  const { app, BrowserWindow } = electron;
+  const { app, BrowserWindow, shell } = electron;
 
   app.setName('Interview Copilot');
+
+  // Phase 6e: we need a single-instance lock so that on Windows, when the user clicks an
+  // ic://auth-callback link in their browser, the OS relaunches us with argv containing
+  // the URL — the first (existing) instance catches it via `second-instance`. Without the
+  // lock, we'd spin up a second copy and the deep link would never reach the live app.
+  if (!app.requestSingleInstanceLock()) {
+    logger.info({}, 'another instance holds the lock; exiting');
+    app.quit();
+    return;
+  }
+
+  // Register ic:// as our custom protocol handler. Best effort — fails benignly if the
+  // user has already pointed ic:// at something else (rare, but don't crash).
+  try {
+    app.setAsDefaultProtocolClient('ic');
+  } catch (err) {
+    logger.warn({ err: String(err) }, 'setAsDefaultProtocolClient failed');
+  }
 
   await app.whenReady();
 
@@ -162,8 +180,19 @@ async function bootstrapWithWindows(): Promise<void> {
   const { registerIpcHandlers, broadcastToRenderers, captureAndShip } = await import(
     './ipc/index'
   );
-  const { setupTray, destroyTray } = await import('./tray');
+  const { setupTray, destroyTray, updateTrayAuth } = await import('./tray');
   const { registerGlobalShortcuts, unregisterAllShortcuts } = await import('./shortcuts');
+  const { AuthStore } = await import('./auth/auth-store');
+  const {
+    beginLogin,
+    parseCallbackUrl,
+    completeLogin,
+    CallbackParseError,
+    CallbackAuthError,
+  } = await import('./auth/login-flow');
+
+  const authStore = new AuthStore({ userDataDir: app.getPath('userData') });
+  await authStore.load();
 
   const overlay = createOverlayWindow();
 
@@ -174,6 +203,48 @@ async function bootstrapWithWindows(): Promise<void> {
   registerIpcHandlers({
     getOverlay: () => (overlay.isDestroyed() ? null : overlay),
     getWs: () => activeWs,
+  });
+
+  const applySessionToWs = (): void => {
+    const sess = authStore.getSession();
+    if (activeWs) activeWs.setToken(sess?.accessToken);
+    updateTrayAuth(
+      sess ? { signedIn: true, ...(sess.email ? { email: sess.email } : {}) } : { signedIn: false },
+    );
+  };
+
+  const handleDeepLink = async (rawUrl: string): Promise<void> => {
+    if (!rawUrl.startsWith('ic://')) return;
+    logger.info({}, 'received ic:// deep link');
+    try {
+      const parsed = parseCallbackUrl(rawUrl);
+      const session = await completeLogin({ authStore, callback: parsed });
+      logger.info({ userId: session.userId, hasEmail: !!session.email }, 'sign-in complete');
+      applySessionToWs();
+    } catch (err) {
+      const reason =
+        err instanceof CallbackParseError || err instanceof CallbackAuthError ? err.reason : 'unknown';
+      logger.warn({ reason, err: String(err) }, 'deep-link handling failed');
+    }
+  };
+
+  // macOS sends deep links via `open-url`. Windows/Linux send them via argv on a second
+  // instance — we relay that through the `second-instance` listener below.
+  app.on('open-url', (event, url) => {
+    event.preventDefault();
+    void handleDeepLink(url);
+  });
+
+  app.on('second-instance', (_event, argv) => {
+    // argv on Windows looks like [exePath, 'ic://auth-callback?...']. Last arg is usually
+    // the URL, but search defensively in case Electron prepends flags.
+    const url = argv.find((a) => a.startsWith('ic://'));
+    if (url) void handleDeepLink(url);
+    // Also bring the overlay forward so the user has visible feedback.
+    if (!overlay.isDestroyed()) {
+      overlay.showInactive();
+      broadcastToRenderers(IpcPushChannels.OverlayVisibility, { visible: true });
+    }
   });
 
   setupTray({
@@ -189,11 +260,36 @@ async function bootstrapWithWindows(): Promise<void> {
         broadcastToRenderers(IpcPushChannels.OverlayVisibility, { visible: false });
       }
     },
+    onSignIn: () => {
+      void (async () => {
+        const { browserUrl } = await beginLogin({
+          authStore,
+          webBaseUrl: config.DESKTOP_WEB_BASE_URL,
+        });
+        logger.info({}, 'opening browser for sign-in');
+        await shell.openExternal(browserUrl);
+      })();
+    },
+    onSignOut: () => {
+      void (async () => {
+        await authStore.clearSession();
+        applySessionToWs();
+        logger.info({}, 'signed out');
+      })();
+    },
     onQuit: () => {
       logger.info({ reason: 'tray' }, 'quit requested');
       app.quit();
     },
   });
+
+  // Reflect any persisted sign-in state in the tray immediately.
+  updateTrayAuth(
+    (() => {
+      const s = authStore.getSession();
+      return s ? { signedIn: true, ...(s.email ? { email: s.email } : {}) } : { signedIn: false };
+    })(),
+  );
 
   registerGlobalShortcuts({
     toggleOverlay: () => {
@@ -227,6 +323,8 @@ async function bootstrapWithWindows(): Promise<void> {
   pipeline.onStats((payload) => {
     broadcastToRenderers(IpcPushChannels.EchoStats, payload);
   });
+  // If we already had a saved session on disk, push its access token into the WS now.
+  applySessionToWs();
 
   app.on('window-all-closed', () => {
     // Tray-resident: do NOT quit. User explicitly quits via tray menu or Ctrl+Shift+Q.

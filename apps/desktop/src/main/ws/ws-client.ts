@@ -57,10 +57,28 @@ export class WsClient {
   private readonly route: WsRoute;
   private sessionParams: SessionStartParams | null = null;
   private statsListeners: ((msg: Extract<ServerMessage, { type: 'echo.stats' }>) => void)[] = [];
+  private token: string | undefined;
 
   constructor(private readonly options: WsClientOptions) {
     this.backoff = options.reconnectBackoffMs ?? DEFAULT_BACKOFF;
     this.route = options.route ?? 'echo';
+    this.token = options.token;
+  }
+
+  /**
+   * Replace the session token and reopen the socket so the new credentials take effect
+   * on the next handshake. No-op on the echo route.
+   *
+   * The auto-reconnect path will re-send `session.start` if we had an active session,
+   * so callers don't need to re-issue `startSession` themselves.
+   */
+  setToken(token: string | undefined): void {
+    if (this.route !== 'session') return;
+    if (this.token === token) return;
+    this.token = token;
+    if (this.ws) {
+      this.ws.close(1000, 'token rotated');
+    }
   }
 
   async connect(): Promise<void> {
@@ -128,7 +146,7 @@ export class WsClient {
 
   private async openOnce(): Promise<void> {
     const path = this.route === 'session' ? '/ws/session' : '/ws/echo';
-    const qs = this.route === 'session' && this.options.token ? `?token=${encodeURIComponent(this.options.token)}` : '';
+    const qs = this.route === 'session' && this.token ? `?token=${encodeURIComponent(this.token)}` : '';
     const url = `${this.options.url}${path}${qs}`;
     const ws = new WebSocket(url);
     this.ws = ws;

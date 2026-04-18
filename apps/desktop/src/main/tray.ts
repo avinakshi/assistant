@@ -4,11 +4,22 @@ import { logger } from './logger';
 import { openSettingsWindow } from './windows/settings';
 
 let tray: Tray | null = null;
+let activeDeps: TrayDeps | null = null;
+let authState: TrayAuthState = { signedIn: false };
 
 export interface TrayDeps {
   onShowOverlay: () => void;
   onHideOverlay: () => void;
   onQuit: () => void;
+  /** Phase 6e. Kick off a browser-based sign-in flow. */
+  onSignIn: () => void;
+  /** Phase 6e. Clear the stored session. */
+  onSignOut: () => void;
+}
+
+export interface TrayAuthState {
+  signedIn: boolean;
+  email?: string;
 }
 
 export function setupTray(deps: TrayDeps): Tray {
@@ -25,17 +36,44 @@ export function setupTray(deps: TrayDeps): Tray {
 
   tray = new Tray(image);
   tray.setToolTip('Interview Copilot');
-  const menu = Menu.buildFromTemplate([
+  activeDeps = deps;
+  rebuildMenu();
+  logger.info({}, 'tray ready');
+  return tray;
+}
+
+/**
+ * Call whenever the auth state changes so the tray menu shows the right "Sign in" /
+ * "Signed in as … / Sign out" items.
+ */
+export function updateTrayAuth(state: TrayAuthState): void {
+  authState = state;
+  rebuildMenu();
+}
+
+function rebuildMenu(): void {
+  if (!tray || !activeDeps) return;
+  const deps = activeDeps;
+  const items: Electron.MenuItemConstructorOptions[] = [
     { label: 'Show Overlay', click: deps.onShowOverlay },
     { label: 'Hide Overlay', click: deps.onHideOverlay },
     { type: 'separator' },
-    { label: 'Open Settings…', click: () => openSettingsWindow() },
+  ];
+  if (authState.signedIn) {
+    items.push(
+      { label: `Signed in${authState.email ? ` as ${authState.email}` : ''}`, enabled: false },
+      { label: 'Sign Out', click: deps.onSignOut },
+    );
+  } else {
+    items.push({ label: 'Sign In\u2026', click: deps.onSignIn });
+  }
+  items.push(
+    { type: 'separator' },
+    { label: 'Open Settings\u2026', click: () => openSettingsWindow() },
     { type: 'separator' },
     { label: 'Quit Interview Copilot', click: deps.onQuit },
-  ]);
-  tray.setContextMenu(menu);
-  logger.info({}, 'tray ready');
-  return tray;
+  );
+  tray.setContextMenu(Menu.buildFromTemplate(items));
 }
 
 export function destroyTray(): void {

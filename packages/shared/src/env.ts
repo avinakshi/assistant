@@ -42,6 +42,8 @@ export type ApiEnv = z.infer<typeof ApiEnvSchema>;
 export const DesktopEnvSchema = CommonEnvSchema.extend({
   DESKTOP_API_BASE_URL: z.string().url().default('http://localhost:3001'),
   DESKTOP_API_WS_URL: z.string().startsWith('ws').default('ws://localhost:3001'),
+  /** Base URL of the web app. Desktop opens `${DESKTOP_WEB_BASE_URL}/login?from=desktop` for sign-in. */
+  DESKTOP_WEB_BASE_URL: z.string().url().default('http://localhost:3000'),
 });
 export type DesktopEnv = z.infer<typeof DesktopEnvSchema>;
 

@@ -12,6 +12,22 @@ export function LoginForm() {
   const [status, setStatus] = useState<Status>({ kind: 'idle' });
   const params = useSearchParams();
   const next = params.get('next') ?? '/app';
+  // Phase 6e: when the desktop app opens us with ?from=desktop&state=<nonce>, thread
+  // those two params through the Supabase round-trip so the callback route knows to
+  // redirect to ic://auth-callback?… instead of /app.
+  const from = params.get('from');
+  const state = params.get('state');
+  const isDesktop = from === 'desktop' && typeof state === 'string' && state.length > 0;
+
+  const buildCallbackUrl = () => {
+    const u = new URL('/auth/callback', window.location.origin);
+    u.searchParams.set('next', next);
+    if (isDesktop) {
+      u.searchParams.set('from', 'desktop');
+      u.searchParams.set('state', state);
+    }
+    return u.toString();
+  };
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,9 +36,7 @@ export function LoginForm() {
     const supabase = createClient();
     const { error } = await supabase.auth.signInWithOtp({
       email,
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
-      },
+      options: { emailRedirectTo: buildCallbackUrl() },
     });
     if (error) setStatus({ kind: 'error', msg: error.message });
     else setStatus({ kind: 'sent' });
@@ -33,9 +47,7 @@ export function LoginForm() {
     const supabase = createClient();
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
-      },
+      options: { redirectTo: buildCallbackUrl() },
     });
     if (error) setStatus({ kind: 'error', msg: error.message });
   };
@@ -44,7 +56,10 @@ export function LoginForm() {
     return (
       <div className="mt-6 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
         <div className="font-medium">Check your inbox</div>
-        <div className="mt-1">We sent a login link to {email}.</div>
+        <div className="mt-1">
+          We sent a login link to {email}.
+          {isDesktop && ' Click it and you\u2019ll be returned to the Interview Copilot app.'}
+        </div>
       </div>
     );
   }
