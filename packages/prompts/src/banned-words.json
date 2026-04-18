@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "comment": "Corporate-speak banned from LLM output. Matched via rolling 5-word window during streaming. If matched: cancel stream, retry with amended prompt. Max 2 retries per answer. See packages/llm-router/src/banned-words.ts.",
+  "words": [
+    "leverage",
+    "synergy",
+    "utilize",
+    "facilitate",
+    "robust",
+    "best-in-class",
+    "cutting-edge",
+    "paradigm",
+    "ecosystem",
+    "holistic",
+    "streamline",
+    "empower",
+    "unlock",
+    "elevate",
+    "curate",
+    "ideate",
+    "pivot",
+    "value-add",
+    "thought leader",
+    "go-to-market",
+    "low-hanging fruit",
+    "drill down",
+    "mission-critical",
+    "synergize",
+    "impactful",
+    "performant",
+    "enterprise-grade",
+    "delve",
+    "furthermore"
+  ],
+  "phrases": [
+    "scalable solution",
+    "moving forward",
+    "circle back",
+    "touch base",
+    "deep dive",
+    "at the end of the day",
+    "seamless experience"
+  ],
+  "allowedContext": [
+    "bandwidth in the networking sense (bytes/sec) is fine; avoid the metaphorical 'I don't have bandwidth'"
+  ]
+}

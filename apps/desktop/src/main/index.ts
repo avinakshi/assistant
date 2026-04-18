@@ -1,0 +1,267 @@
+/**
+ * Electron main process entry.
+ *
+ * Phase 3 surface:
+ *   - overlay (stealth) + settings windows
+ *   - tray icon with menu
+ *   - global shortcuts (Ctrl+Shift+H / S / Q)
+ *   - audio pipeline: AudioSource → WS → api `/ws/session` (when WS_SHARED_SECRET set) or
+ *     `/ws/echo` (diagnostic fallback).
+ *   - transcript pipeline: api → main → IPC broadcast to overlay renderer
+ *
+ * Run modes:
+ *   - Under Electron (production/start): `electron dist/main/index.js`
+ *   - Under tsx for pipeline-only dev: `tsx watch src/main/index.ts`
+ */
+import { AudioPipeline } from './audio/pipeline';
+import { createAudioSource, type AudioSourceKind } from './audio/audio-source';
+import { WsClient, type WsRoute } from './ws/ws-client';
+import { logger } from './logger';
+import { config } from './config';
+import {
+  IpcPushChannels,
+  type AnswerCanceledPayload,
+  type AnswerDeltaPayload,
+  type AnswerDonePayload,
+  type AnswerStartPayload,
+  type SessionEventPayload,
+  type TranscriptFinalPayload,
+  type TranscriptPartialPayload,
+} from '../shared/ipc-contract';
+
+function resolveAudioSource(): AudioSourceKind {
+  const raw = process.env.AUDIO_SOURCE;
+  return raw === 'native' ? 'native' : 'stub';
+}
+
+function resolveWsRoute(): WsRoute {
+  // Prefer /ws/session when we have a token — it's the real product flow.
+  const raw = process.env.WS_ROUTE;
+  if (raw === 'echo' || raw === 'session') return raw;
+  return process.env.WS_SHARED_SECRET ? 'session' : 'echo';
+}
+
+const AUDIO_SOURCE: AudioSourceKind = resolveAudioSource();
+const WS_ROUTE: WsRoute = resolveWsRoute();
+const SESSION_LANGUAGE = process.env.SESSION_LANGUAGE ?? 'en';
+
+interface PipelineRefs {
+  pipeline: AudioPipeline;
+  ws: WsClient;
+  shutdown: () => Promise<void>;
+}
+
+async function bootstrapPipeline(
+  broadcast?: (channel: (typeof IpcPushChannels)[keyof typeof IpcPushChannels], payload: unknown) => void,
+): Promise<PipelineRefs> {
+  logger.info(
+    { audioSource: AUDIO_SOURCE, route: WS_ROUTE, apiUrl: config.DESKTOP_API_WS_URL, language: SESSION_LANGUAGE },
+    'desktop main starting pipeline',
+  );
+  const source = createAudioSource(AUDIO_SOURCE);
+  const sessionToken = WS_ROUTE === 'session' ? process.env.WS_SHARED_SECRET : undefined;
+  const ws = new WsClient({
+    url: config.DESKTOP_API_WS_URL,
+    route: WS_ROUTE,
+    ...(sessionToken ? { token: sessionToken } : {}),
+    onReady: () => {
+      logger.info({}, 'session ready');
+      broadcast?.(IpcPushChannels.SessionEvent, { kind: 'ready' } satisfies SessionEventPayload);
+    },
+    onTerminalError: (msg) => {
+      const kind: SessionEventPayload['kind'] =
+        msg.code === 'AUTH' ? 'auth-failed' : 'quota-exceeded';
+      broadcast?.(IpcPushChannels.SessionEvent, { kind, message: msg.message });
+    },
+    onMessage: (msg) => {
+      if (!broadcast) return;
+      if (msg.type === 'transcript.partial') {
+        // Log only the character count — never the transcript text itself (interviewer
+        // speech is PII under two-party consent).
+        logger.debug({ chars: msg.text.length, ts: msg.ts }, 'transcript.partial → renderer');
+        broadcast(IpcPushChannels.TranscriptPartial, {
+          text: msg.text,
+          ts: msg.ts,
+        } satisfies TranscriptPartialPayload);
+      } else if (msg.type === 'transcript.final') {
+        logger.info(
+          { chars: msg.text.length, isQuestion: msg.isQuestion, ts: msg.ts },
+          'transcript.final → renderer',
+        );
+        broadcast(IpcPushChannels.TranscriptFinal, {
+          text: msg.text,
+          ts: msg.ts,
+          isQuestion: msg.isQuestion,
+        } satisfies TranscriptFinalPayload);
+      } else if (msg.type === 'answer.start') {
+        logger.info(
+          { answerId: msg.answerId, provider: msg.provider, mode: msg.mode },
+          'answer.start → renderer',
+        );
+        broadcast(IpcPushChannels.AnswerStart, {
+          answerId: msg.answerId,
+          provider: msg.provider,
+          ...(msg.mode ? { mode: msg.mode } : {}),
+        } satisfies AnswerStartPayload);
+      } else if (msg.type === 'answer.delta') {
+        // No PII logging of delta text; the full answer stream is considered interview PII.
+        broadcast(IpcPushChannels.AnswerDelta, {
+          answerId: msg.answerId,
+          text: msg.text,
+        } satisfies AnswerDeltaPayload);
+      } else if (msg.type === 'answer.done') {
+        logger.info(
+          { answerId: msg.answerId, latencyMs: msg.latencyMs, totalTokens: msg.totalTokens },
+          'answer.done → renderer',
+        );
+        broadcast(IpcPushChannels.AnswerDone, {
+          answerId: msg.answerId,
+          totalTokens: msg.totalTokens,
+          latencyMs: msg.latencyMs,
+        } satisfies AnswerDonePayload);
+      } else if (msg.type === 'answer.canceled') {
+        logger.info(
+          { answerId: msg.answerId, reason: msg.reason },
+          'answer.canceled → renderer',
+        );
+        broadcast(IpcPushChannels.AnswerCanceled, {
+          answerId: msg.answerId,
+          reason: msg.reason,
+        } satisfies AnswerCanceledPayload);
+      }
+    },
+  });
+  const pipeline = new AudioPipeline(source, ws);
+  await pipeline.start();
+
+  if (WS_ROUTE === 'session') {
+    // Kick off the session immediately. Phase 6 moves this behind an explicit user action
+    // (hotkey Ctrl+Shift+S / tray button) once sessions have usage quotas.
+    ws.startSession({ language: SESSION_LANGUAGE, mode: 'auto', llm: 'auto' });
+  }
+
+  return {
+    pipeline,
+    ws,
+    shutdown: async () => {
+      if (WS_ROUTE === 'session') ws.stopSession();
+      await pipeline.stop();
+    },
+  };
+}
+
+async function bootstrapWithWindows(): Promise<void> {
+  const electron = await import('electron');
+  const { app, BrowserWindow } = electron;
+
+  app.setName('Interview Copilot');
+
+  await app.whenReady();
+
+  const { createOverlayWindow } = await import('./windows/overlay');
+  const { registerIpcHandlers, broadcastToRenderers, captureAndShip } = await import(
+    './ipc/index'
+  );
+  const { setupTray, destroyTray } = await import('./tray');
+  const { registerGlobalShortcuts, unregisterAllShortcuts } = await import('./shortcuts');
+
+  const overlay = createOverlayWindow();
+
+  // WsClient reference — set once the pipeline bootstraps below. IPC + hotkey handlers
+  // read this lazily so they don't crash if they fire before the pipeline is ready.
+  let activeWs: import('./ws/ws-client').WsClient | null = null;
+
+  registerIpcHandlers({
+    getOverlay: () => (overlay.isDestroyed() ? null : overlay),
+    getWs: () => activeWs,
+  });
+
+  setupTray({
+    onShowOverlay: () => {
+      if (!overlay.isDestroyed()) {
+        overlay.showInactive();
+        broadcastToRenderers(IpcPushChannels.OverlayVisibility, { visible: true });
+      }
+    },
+    onHideOverlay: () => {
+      if (!overlay.isDestroyed()) {
+        overlay.hide();
+        broadcastToRenderers(IpcPushChannels.OverlayVisibility, { visible: false });
+      }
+    },
+    onQuit: () => {
+      logger.info({ reason: 'tray' }, 'quit requested');
+      app.quit();
+    },
+  });
+
+  registerGlobalShortcuts({
+    toggleOverlay: () => {
+      if (overlay.isDestroyed()) return;
+      if (overlay.isVisible()) {
+        overlay.hide();
+        broadcastToRenderers(IpcPushChannels.OverlayVisibility, { visible: false });
+      } else {
+        overlay.showInactive();
+        broadcastToRenderers(IpcPushChannels.OverlayVisibility, { visible: true });
+      }
+    },
+    startStopSession: () => {
+      logger.info({}, 'Ctrl+Shift+S — session toggle (Phase 6 binds user action)');
+    },
+    quit: () => {
+      logger.info({ reason: 'shortcut' }, 'quit requested');
+      app.quit();
+    },
+    captureScreenshot: () => {
+      void captureAndShip({ getWs: () => activeWs });
+    },
+  });
+
+  const {
+    pipeline,
+    ws: pipelineWs,
+    shutdown: shutdownPipeline,
+  } = await bootstrapPipeline(broadcastToRenderers);
+  activeWs = pipelineWs;
+  pipeline.onStats((payload) => {
+    broadcastToRenderers(IpcPushChannels.EchoStats, payload);
+  });
+
+  app.on('window-all-closed', () => {
+    // Tray-resident: do NOT quit. User explicitly quits via tray menu or Ctrl+Shift+Q.
+  });
+
+  app.on('before-quit', async () => {
+    logger.info({}, 'before-quit: tearing down');
+    unregisterAllShortcuts();
+    destroyTray();
+    try {
+      await shutdownPipeline();
+    } catch (err) {
+      logger.error({ err: String(err) }, 'pipeline shutdown failed');
+    }
+  });
+
+  logger.info({ windowCount: BrowserWindow.getAllWindows().length }, 'desktop ready');
+}
+
+async function bootstrapHeadless(): Promise<void> {
+  const { shutdown } = await bootstrapPipeline();
+  const stop = async (signal: string): Promise<void> => {
+    logger.info({ signal }, 'desktop main shutting down (headless)');
+    await shutdown();
+    process.exit(0);
+  };
+  process.on('SIGINT', () => void stop('SIGINT'));
+  process.on('SIGTERM', () => void stop('SIGTERM'));
+}
+
+if (typeof process !== 'undefined' && process.versions?.electron === undefined) {
+  void bootstrapHeadless();
+} else {
+  void bootstrapWithWindows().catch((err: unknown) => {
+    logger.error({ err: String(err) }, 'fatal bootstrap error');
+    process.exit(1);
+  });
+}

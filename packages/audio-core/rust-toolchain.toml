@@ -1,0 +1,6 @@
+[toolchain]
+# Plan pins "Rust 1.80+". The npm audio/native ecosystem (napi-build 2.3+, unicode-segmentation
+# 1.13+) bumped MSRV past 1.80, so we track stable. If CI needs reproducibility, pin to a
+# specific 1.x.y here.
+channel = "stable"
+components = ["clippy", "rustfmt"]

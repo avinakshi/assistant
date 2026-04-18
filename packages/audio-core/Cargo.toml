@@ -1,0 +1,60 @@
+[package]
+name = "audio-core"
+version = "0.0.1"
+edition = "2021"
+rust-version = "1.80"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+napi = { version = "2", features = ["async", "napi6"] }
+napi-derive = "2"
+thiserror = "1"
+tracing = "0.1"
+rubato = "0.15"
+# Bounded in-process queue for decoupling OS capture thread from napi callback dispatch.
+crossbeam-channel = "0.5"
+# PNG encode for captureScreenshot(). Disable default features (avoids pulling JPEG/GIF decoders).
+image = { version = "0.25", default-features = false, features = ["png"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+# windows-rs: WASAPI + display affinity + window enumeration + GDI screenshot.
+windows = { version = "0.58", features = [
+  "Win32_Foundation",
+  "Win32_Media_Audio",
+  "Win32_System_Com",
+  "Win32_System_Threading",
+  "Win32_Graphics_Gdi",
+  "Win32_UI_WindowsAndMessaging",
+  "Win32_Security",
+  "Win32_System_Power",
+  # Added in Phase 2 for SetWindowDisplayAffinity + WDA_EXCLUDEFROMCAPTURE.
+  # These live under the same Win32_UI_WindowsAndMessaging feature already enabled above.
+] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+# screencapturekit: idiomatic SCKit wrapper. Mac work deferred — present to keep cfg compiles.
+screencapturekit = "0.3"
+core-foundation = "0.10"
+core-graphics = "0.24"
+
+[build-dependencies]
+napi-build = "2"
+
+[profile.release]
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = "symbols"
+
+[lints.rust]
+unsafe_op_in_unsafe_fn = "warn"
+
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+# These fire on generated napi-derive code — quiet them at crate level.
+module_name_repetitions = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"

@@ -1,0 +1,63 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+build/
+out/
+.next/
+.turbo/
+target/
+*.tsbuildinfo
+
+# Native binaries (committed per-platform in release pipeline, not dev)
+*.node
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+pnpm-debug.log*
+
+# Env
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Editor
+.vscode/*
+!.vscode/settings.json.example
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Coverage
+coverage/
+.nyc_output/
+
+# Electron
+apps/desktop/release/
+apps/desktop/out/
+
+# Rust / Cargo
+packages/audio-core/target/
+Cargo.lock
+!packages/audio-core/Cargo.lock
+
+# Signing artifacts
+*.pfx
+*.p12
+*.mobileprovision
+apps/desktop/resources/entitlements.local.plist
+
+# Secrets
+secrets/
+*.pem
+!test-fixtures/**/*.pem
