@@ -61,3 +61,6 @@ apps/desktop/resources/entitlements.local.plist
 secrets/
 *.pem
 !test-fixtures/**/*.pem
+
+# Generated smoke-test fixtures (scripts/smoke/*.mjs render these on demand)
+scripts/smoke/fixtures/

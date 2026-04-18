@@ -215,9 +215,15 @@ async function bootstrapWithWindows(): Promise<void> {
     onInstallUpdate: () => installAndRelaunch(),
   });
 
+  // Dev/CI callers pass WS_SHARED_SECRET so the WS works without a signed-in user.
+  // Preserve it as the fallback token: on sign-out (or before first sign-in) we re-apply
+  // it rather than wiping the token to undefined, which would 1008-auth every reconnect.
+  const fallbackToken =
+    WS_ROUTE === 'session' ? process.env.WS_SHARED_SECRET ?? undefined : undefined;
+
   const applySessionToWs = (): void => {
     const sess = authStore.getSession();
-    if (activeWs) activeWs.setToken(sess?.accessToken);
+    if (activeWs) activeWs.setToken(sess?.accessToken ?? fallbackToken);
     updateTrayAuth(
       sess ? { signedIn: true, ...(sess.email ? { email: sess.email } : {}) } : { signedIn: false },
     );
