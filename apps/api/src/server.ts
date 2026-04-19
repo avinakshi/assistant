@@ -4,6 +4,7 @@ import { config } from './config';
 import { echoRoutePlugin } from './ws/echo-handler';
 import { sessionRoutePlugin } from './ws/session-handler';
 import { practiceSttRoutePlugin } from './ws/practice-stt-handler';
+import { prefsRoutePlugin } from './rest/prefs';
 
 export async function buildServer(): Promise<FastifyInstance> {
   const app = Fastify({
@@ -26,6 +27,9 @@ export async function buildServer(): Promise<FastifyInstance> {
   });
 
   app.get('/health', async () => ({ ok: true, service: 'api', ts: Date.now() }));
+
+  // Small HTTP surfaces.
+  await app.register(prefsRoutePlugin);
 
   await app.register(echoRoutePlugin);
 

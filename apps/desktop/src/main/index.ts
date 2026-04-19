@@ -249,16 +249,27 @@ async function bootstrapWithWindows(): Promise<void> {
       return;
     }
     if (next) {
-      activeWs.startSession({
-        language: SESSION_LANGUAGE,
-        mode: 'auto',
-        llm: 'auto',
-        // Phase 9: persist turns + LLM answers for post-session review. Users can delete
-        // any session from /app/sessions afterward. A future Settings toggle can flip the
-        // default; hardcoded true for now since most users running live mode want review.
-        persistTranscripts: true,
-      });
-      logger.info({}, 'listening started');
+      // Kick off async prefs lookup, then fire session.start. We optimistically flip the
+      // UI to "listening" immediately and patch the tray after — the prefs RTT is 3s at
+      // worst and usually <100ms on localhost. If the fetch fails we default to true.
+      void (async () => {
+        const sess = authStore.getSession();
+        const { fetchUserPrefs } = await import('./prefs');
+        const prefs = await fetchUserPrefs({
+          apiBaseUrl: config.DESKTOP_API_BASE_URL,
+          token: sess?.accessToken,
+        });
+        activeWs?.startSession({
+          language: SESSION_LANGUAGE,
+          mode: 'auto',
+          llm: 'auto',
+          persistTranscripts: prefs.persistTranscriptsDefault,
+        });
+        logger.info(
+          { persistTranscripts: prefs.persistTranscriptsDefault },
+          'listening started',
+        );
+      })();
       broadcastToRenderers(IpcPushChannels.SessionEvent, {
         kind: 'listening',
       } satisfies SessionEventPayload);
