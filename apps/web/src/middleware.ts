@@ -5,6 +5,7 @@
  */
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
+import { applySecurityHeaders } from './lib/security-headers';
 
 interface CookieEntry {
   name: string;
@@ -47,16 +48,36 @@ export async function middleware(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     url.searchParams.set('next', pathname);
-    return NextResponse.redirect(url);
+    return applySecurityHeaders(NextResponse.redirect(url));
   }
   if (isAuthPage && user) {
     const url = request.nextUrl.clone();
     url.pathname = '/app';
     url.search = '';
-    return NextResponse.redirect(url);
+    return applySecurityHeaders(NextResponse.redirect(url));
   }
 
-  return response;
+  // Phase 11b onboarding gate: first-time users land on /welcome until they dismiss it.
+  // We only run the profile check on /app paths to keep the middleware's hot path cheap
+  // for every other request.
+  if (user && pathname.startsWith('/app')) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('onboarded_at')
+      .eq('user_id', user.id)
+      .maybeSingle();
+    // `onboarded_at` is null on a fresh profile row (the trigger in migration 0001
+    // inserts with NULL). Once set, the middleware stops redirecting.
+    const needsOnboarding = !(profile as { onboarded_at?: string | null } | null)?.onboarded_at;
+    if (needsOnboarding) {
+      const url = request.nextUrl.clone();
+      url.pathname = '/welcome';
+      url.search = '';
+      return applySecurityHeaders(NextResponse.redirect(url));
+    }
+  }
+
+  return applySecurityHeaders(response);
 }
 
 export const config = {

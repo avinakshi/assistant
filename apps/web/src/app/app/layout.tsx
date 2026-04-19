@@ -29,7 +29,18 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex min-h-screen">
-      <aside className="hidden w-56 shrink-0 flex-col border-r border-ink-100 bg-white p-4 md:flex">
+      {/* Skip-to-content link for keyboard users — visible only on focus so it stays out
+          of the sighted layout. */}
+      <a
+        href="#app-main"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded focus:bg-brand-600 focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-white"
+      >
+        Skip to main content
+      </a>
+      <aside
+        aria-label="Primary navigation"
+        className="hidden w-56 shrink-0 flex-col border-r border-ink-100 bg-white p-4 md:flex"
+      >
         <Link href="/app" className="mb-6 block text-sm font-semibold text-ink-900">
           Interview Copilot
         </Link>
@@ -38,7 +49,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <Link
               key={item.href}
               href={item.href}
-              className="rounded px-2 py-1.5 text-ink-700 transition hover:bg-ink-50"
+              className="rounded px-2 py-1.5 text-ink-700 transition hover:bg-ink-50 focus-visible:outline-2 focus-visible:outline-brand-500"
             >
               {item.label}
             </Link>
@@ -51,7 +62,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <SignOutButton />
         </div>
       </aside>
-      <main className="flex-1 bg-ink-50">{children}</main>
+      <main id="app-main" className="flex-1 bg-ink-50">
+        {children}
+      </main>
     </div>
   );
 }
