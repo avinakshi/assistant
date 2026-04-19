@@ -6,16 +6,27 @@ import { createClient } from '@/lib/supabase/client';
 type State = 'loading' | 'ready' | 'no-session' | 'copied' | 'error';
 
 /**
- * Shows the user's current Supabase access_token + a copy button. The Chrome extension
- * can't read browser cookies (host isolation), so today the simplest auth path is:
- * paste the token from here into the extension's Config panel.
+ * Builds a session-bundle JSON the Chrome extension consumes with one paste. The
+ * extension uses the refresh token to auto-renew the access token when it expires, so
+ * the user doesn't have to come back and re-copy every hour — unlike the original
+ * "just copy the access token" design.
  *
- * Tokens expire ~1 hour; the user can regrab any time. A follow-up could wire a
- * longer-lived API key model, but MVP keeps it simple.
+ * The anon key + Supabase URL are embedded too since the refresh endpoint lives on the
+ * Supabase project and needs both. Safe to expose (anon key is public by design).
  */
+
+interface SessionBundle {
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: number;
+  supabaseUrl: string;
+  supabaseAnonKey: string;
+  apiBaseUrl?: string;
+}
+
 export function CopyTokenCard() {
   const [state, setState] = useState<State>('loading');
-  const [token, setToken] = useState('');
+  const [bundle, setBundle] = useState<SessionBundle | null>(null);
 
   useEffect(() => {
     const supabase = createClient();
@@ -24,15 +35,27 @@ export function CopyTokenCard() {
         setState('no-session');
         return;
       }
-      setToken(data.session.access_token);
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
+      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '';
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+      setBundle({
+        accessToken: data.session.access_token,
+        refreshToken: data.session.refresh_token,
+        expiresAt: data.session.expires_at ?? Math.floor(Date.now() / 1_000) + 3_600,
+        supabaseUrl,
+        supabaseAnonKey,
+        ...(apiBaseUrl ? { apiBaseUrl } : {}),
+      });
       setState('ready');
     });
   }, []);
 
+  const json = bundle ? JSON.stringify(bundle, null, 2) : '';
+
   const copy = async () => {
-    if (!token) return;
+    if (!json) return;
     try {
-      await navigator.clipboard.writeText(token);
+      await navigator.clipboard.writeText(json);
       setState('copied');
       setTimeout(() => setState('ready'), 2_000);
     } catch {
@@ -42,11 +65,11 @@ export function CopyTokenCard() {
 
   return (
     <div className="rounded-xl border border-ink-100 bg-white p-5">
-      <div className="text-sm font-semibold text-ink-900">Chrome extension token</div>
+      <div className="text-sm font-semibold text-ink-900">Chrome extension session</div>
       <p className="mt-1 text-xs text-ink-500">
-        The Chrome extension needs your access token to call the API on your behalf.
-        Paste it into the extension\u2019s Config panel. Tokens expire after about an hour
-        \u2014 come back here to grab a fresh one if the extension says "token rejected".
+        Paste this JSON into the extension\u2019s Config \u2192 Session JSON field. The
+        extension keeps refreshing on its own after that \u2014 you won\u2019t need to come
+        back here unless you sign out or switch devices.
       </p>
       {state === 'loading' && (
         <div className="mt-3 text-xs text-ink-500">Loading session\u2026</div>
@@ -56,29 +79,29 @@ export function CopyTokenCard() {
           You\u2019re signed out in this tab. Refresh or sign in again.
         </div>
       )}
-      {(state === 'ready' || state === 'copied' || state === 'error') && (
+      {(state === 'ready' || state === 'copied' || state === 'error') && bundle && (
         <>
-          <div className="mt-3 flex items-center gap-2">
-            <code className="flex-1 truncate rounded bg-ink-50 px-2 py-1.5 text-xs font-mono text-ink-700">
-              {token.slice(0, 12)}\u2026{token.slice(-8)}
-            </code>
+          <pre className="mt-3 max-h-48 overflow-y-auto rounded bg-ink-50 p-3 text-[11px] font-mono text-ink-700">
+            {json}
+          </pre>
+          <div className="mt-2 flex items-center justify-between gap-2">
+            <span className="text-[11px] text-ink-500">
+              Access token expires {new Date(bundle.expiresAt * 1000).toLocaleTimeString()};
+              refresh token valid much longer.
+            </span>
             <button
               type="button"
               onClick={() => void copy()}
               className="rounded bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700"
             >
-              {state === 'copied' ? 'Copied \u2713' : 'Copy'}
+              {state === 'copied' ? 'Copied \u2713' : 'Copy JSON'}
             </button>
           </div>
           {state === 'error' && (
             <div className="mt-2 rounded border border-red-200 bg-red-50 p-2 text-xs text-red-800">
-              Clipboard access blocked. Select the token above and copy manually.
+              Clipboard access blocked. Select the JSON above and copy manually.
             </div>
           )}
-          <div className="mt-3 text-[11px] text-ink-500">
-            Tip: if the extension popup is open, the pasted token takes effect immediately
-            once you click <em>Save</em>.
-          </div>
         </>
       )}
     </div>

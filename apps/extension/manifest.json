@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Interview Copilot",
   "version": "0.1.0",
-  "description": "Extracts coding problems from LeetCode and fetches AI solutions via your Interview Copilot account.",
+  "description": "Extracts coding problems from LeetCode and HackerRank and fetches AI solutions via your Interview Copilot account.",
   "action": {
     "default_popup": "popup.html",
     "default_title": "Interview Copilot"
@@ -10,6 +10,7 @@
   "permissions": ["storage", "activeTab"],
   "host_permissions": [
     "https://leetcode.com/*",
+    "https://www.hackerrank.com/*",
     "http://localhost:3001/*"
   ],
   "background": {
@@ -20,6 +21,11 @@
     {
       "matches": ["https://leetcode.com/problems/*"],
       "js": ["content-leetcode.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://www.hackerrank.com/challenges/*"],
+      "js": ["content-hackerrank.js"],
       "run_at": "document_idle"
     }
   ],

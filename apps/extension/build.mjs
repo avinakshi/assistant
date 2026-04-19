@@ -24,6 +24,7 @@ const entries = {
   popup: 'src/popup.ts',
   background: 'src/background.ts',
   'content-leetcode': 'src/content-leetcode.ts',
+  'content-hackerrank': 'src/content-hackerrank.ts',
 };
 
 for (const [name, entry] of Object.entries(entries)) {

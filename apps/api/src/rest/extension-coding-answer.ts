@@ -89,6 +89,19 @@ export const extensionCodingAnswerPlugin: FastifyPluginAsync = async (app: Fasti
     let firstTokenAt: number | null = null;
     let provider = 'unknown';
 
+    // Stream as NDJSON — every line is a self-contained JSON event. Simpler than SSE
+    // for a POST + fetch consumer (no EventSource framing). Extension reads
+    // Response.body.getReader() and splits on newlines.
+    reply.hijack();
+    const raw = reply.raw;
+    raw.setHeader('content-type', 'application/x-ndjson; charset=utf-8');
+    raw.setHeader('cache-control', 'no-cache');
+    raw.setHeader('connection', 'keep-alive');
+    raw.flushHeaders?.();
+    const writeLine = (obj: Record<string, unknown>): void => {
+      raw.write(JSON.stringify(obj) + '\n');
+    };
+
     try {
       const stream = await router.startStream({
         tier: 'free',
@@ -115,28 +128,25 @@ export const extensionCodingAnswerPlugin: FastifyPluginAsync = async (app: Fasti
         },
       });
       provider = stream.provider;
-      const parts: string[] = [];
+      writeLine({ type: 'start', provider });
+      let chars = 0;
       for await (const delta of stream.deltas) {
         if (firstTokenAt === null) firstTokenAt = Date.now();
-        parts.push(delta);
+        chars += delta.length;
+        writeLine({ type: 'delta', text: delta });
       }
-      const answer = parts.join('');
       const latencyMs = (firstTokenAt ?? Date.now()) - start;
+      writeLine({ type: 'done', provider, latencyMs, chars });
       logger.info(
-        {
-          userId: auth.userId,
-          provider,
-          latencyMs,
-          chars: answer.length,
-          hasTitle: !!problem.title,
-        },
+        { userId: auth.userId, provider, latencyMs, chars, hasTitle: !!problem.title },
         'extension: coding answer',
       );
-      return reply.send({ answer, provider, latencyMs });
+      raw.end();
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       logger.warn({ err: message, provider }, 'extension: llm error');
-      return reply.code(502).send({ error: message, provider });
+      try { writeLine({ type: 'error', message }); } catch { /* ignore */ }
+      try { raw.end(); } catch { /* ignore */ }
     }
   });
 };

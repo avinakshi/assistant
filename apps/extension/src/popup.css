@@ -51,6 +51,7 @@ input, textarea {
 }
 textarea { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; }
 .config-actions { display: flex; gap: 6px; margin-top: 8px; }
+#config-message { margin-top: 6px; font-size: 11px; color: var(--emerald); min-height: 14px; }
 button {
   padding: 6px 10px;
   font: inherit;

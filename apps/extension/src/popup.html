@@ -19,13 +19,18 @@
           <input id="api-url" type="url" placeholder="http://localhost:3001" />
         </label>
         <label>
-          Access token (paste from /app/settings)
-          <textarea id="token" rows="3" placeholder="eyJhbGciOi..."></textarea>
+          Session JSON (paste the whole blob from /app/settings \u2192 "Chrome extension session")
+          <textarea
+            id="bundle"
+            rows="4"
+            placeholder='{ "accessToken": "...", "refreshToken": "...", "supabaseUrl": "...", "supabaseAnonKey": "...", "expiresAt": 1234567890 }'
+          ></textarea>
         </label>
         <div class="config-actions">
           <button id="save-config" type="button">Save</button>
-          <button id="clear-token" type="button" class="secondary">Clear token</button>
+          <button id="clear-session" type="button" class="secondary">Clear session</button>
         </div>
+        <div id="config-message"></div>
       </details>
     </section>
 

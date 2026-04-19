@@ -1,14 +1,23 @@
 /**
  * Popup UI driver. On open:
- *   1. Read stored config (token + apiBaseUrl).
- *   2. If the active tab is a LeetCode problem page, ask the content script for the
- *      extracted problem and preview it.
- *   3. "Get solution" calls the api with the problem + user's JWT, renders the answer.
+ *   1. Read stored config (session bundle + apiBaseUrl).
+ *   2. If the access token is near expiry, proactively refresh it via Supabase.
+ *   3. If the active tab is a LeetCode problem or HackerRank challenge, ask the content
+ *      script for the extracted problem and preview it.
+ *   4. "Get solution" calls the api with the problem + current JWT; streams the answer
+ *      into the pane. If the api returns 401, we refresh once and retry.
  *
  * All errors surface in a red banner — never a silent failure.
  */
-import { readConfig, writeConfig, clearToken } from './lib/storage';
-import { fetchCodingAnswer, ApiError } from './lib/api';
+import {
+  readConfig,
+  writeConfig,
+  clearSession,
+  parseSessionBundle,
+  type ExtensionConfig,
+} from './lib/storage';
+import { streamCodingAnswer, ApiError } from './lib/api';
+import { refreshSupabaseSession, RefreshError, tokenNeedsRefresh } from './lib/refresh';
 import type { ExtractedProblem } from './lib/leetcode-parser';
 
 type State =
@@ -16,16 +25,16 @@ type State =
   | { kind: 'loading-problem' }
   | { kind: 'ready'; problem: ExtractedProblem }
   | { kind: 'no-problem'; reason: string }
-  | { kind: 'fetching-answer'; problem: ExtractedProblem }
+  | { kind: 'fetching-answer'; problem: ExtractedProblem; answer: string; provider: string }
   | { kind: 'answered'; problem: ExtractedProblem; answer: string; provider: string; latencyMs: number }
   | { kind: 'error'; message: string };
 
 const els = {
   status: document.getElementById('status') as HTMLSpanElement,
   apiUrl: document.getElementById('api-url') as HTMLInputElement,
-  token: document.getElementById('token') as HTMLTextAreaElement,
+  bundle: document.getElementById('bundle') as HTMLTextAreaElement,
   saveConfig: document.getElementById('save-config') as HTMLButtonElement,
-  clearToken: document.getElementById('clear-token') as HTMLButtonElement,
+  clearSession: document.getElementById('clear-session') as HTMLButtonElement,
   problemSection: document.getElementById('problem-section') as HTMLElement,
   problemTitle: document.getElementById('problem-title') as HTMLElement,
   problemDifficulty: document.getElementById('problem-difficulty') as HTMLElement,
@@ -36,38 +45,74 @@ const els = {
   answerText: document.getElementById('answer-text') as HTMLElement,
   errorSection: document.getElementById('error-section') as HTMLElement,
   errorText: document.getElementById('error-text') as HTMLElement,
+  configMessage: document.getElementById('config-message') as HTMLElement,
 };
 
 let state: State = { kind: 'idle' };
-let config: Awaited<ReturnType<typeof readConfig>> = {};
+let config: ExtensionConfig = {};
 
 async function main(): Promise<void> {
   config = await readConfig();
   els.apiUrl.value = config.apiBaseUrl ?? '';
-  els.token.value = config.token ?? '';
   render();
 
   els.saveConfig.addEventListener('click', async () => {
     const apiBaseUrl = els.apiUrl.value.trim();
-    const token = els.token.value.trim();
-    await writeConfig({
-      ...(apiBaseUrl ? { apiBaseUrl } : {}),
-      ...(token ? { token } : {}),
-    });
+    const bundleRaw = els.bundle.value.trim();
+    if (bundleRaw.length > 0) {
+      const bundle = parseSessionBundle(bundleRaw);
+      if (!bundle) {
+        showConfigMessage('Pasted session JSON is not valid. Copy fresh from /app/settings.');
+        return;
+      }
+      await writeConfig({
+        accessToken: bundle.accessToken,
+        refreshToken: bundle.refreshToken,
+        expiresAt: bundle.expiresAt,
+        supabaseUrl: bundle.supabaseUrl,
+        supabaseAnonKey: bundle.supabaseAnonKey,
+        apiBaseUrl: bundle.apiBaseUrl ?? apiBaseUrl ?? undefined,
+      });
+      els.bundle.value = '';
+    } else if (apiBaseUrl) {
+      await writeConfig({ apiBaseUrl });
+    }
     config = await readConfig();
+    showConfigMessage('Saved.');
     render();
   });
 
-  els.clearToken.addEventListener('click', async () => {
-    await clearToken();
+  els.clearSession.addEventListener('click', async () => {
+    await clearSession();
     config = await readConfig();
-    els.token.value = '';
     render();
   });
 
   els.getSolution.addEventListener('click', () => void onGetSolution());
 
+  // Proactive refresh on open — if the token is close to expiring, silently renew so
+  // the first click doesn't have to retry.
+  if (config.refreshToken && tokenNeedsRefresh(config.expiresAt)) {
+    await tryRefresh();
+  }
+
   await loadProblemFromActiveTab();
+}
+
+interface SiteMatch {
+  readonly site: 'leetcode' | 'hackerrank';
+  readonly messageType: 'extract-leetcode' | 'extract-hackerrank';
+  readonly label: string;
+}
+
+function detectSite(url: string): SiteMatch | null {
+  if (/^https:\/\/leetcode\.com\/problems\//.test(url)) {
+    return { site: 'leetcode', messageType: 'extract-leetcode', label: 'LeetCode' };
+  }
+  if (/^https:\/\/www\.hackerrank\.com\/challenges\//.test(url)) {
+    return { site: 'hackerrank', messageType: 'extract-hackerrank', label: 'HackerRank' };
+  }
+  return null;
 }
 
 async function loadProblemFromActiveTab(): Promise<void> {
@@ -75,82 +120,159 @@ async function loadProblemFromActiveTab(): Promise<void> {
   render();
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!tab?.id || !tab.url || !/^https:\/\/leetcode\.com\/problems\//.test(tab.url)) {
-      state = { kind: 'no-problem', reason: 'Open a LeetCode problem page to extract it.' };
+    const match = tab?.url ? detectSite(tab.url) : null;
+    if (!tab?.id || !match) {
+      state = {
+        kind: 'no-problem',
+        reason: 'Open a LeetCode problem or HackerRank challenge page to extract it.',
+      };
       render();
       return;
     }
-    const response = await chrome.tabs.sendMessage(tab.id, { type: 'extract-leetcode' });
+    const response = await chrome.tabs.sendMessage(tab.id, { type: match.messageType });
     if (!response?.ok || !response.problem) {
       state = {
         kind: 'no-problem',
         reason:
-          response?.error ?? 'Couldn\u2019t read the problem. Try reloading the LeetCode tab.',
+          response?.error ??
+          `Couldn\u2019t read the problem. Try reloading the ${match.label} tab.`,
       };
       render();
       return;
     }
     state = { kind: 'ready', problem: response.problem as ExtractedProblem };
     render();
-  } catch (err) {
+  } catch {
     state = {
       kind: 'no-problem',
       reason:
-        'Extension not yet injected on this tab. Reload the LeetCode page and reopen the popup.',
+        'Extension not yet injected on this tab. Reload the problem page and reopen the popup.',
     };
     render();
+  }
+}
+
+async function tryRefresh(): Promise<boolean> {
+  if (!config.refreshToken || !config.supabaseUrl || !config.supabaseAnonKey) return false;
+  try {
+    const out = await refreshSupabaseSession({
+      supabaseUrl: config.supabaseUrl,
+      supabaseAnonKey: config.supabaseAnonKey,
+      refreshToken: config.refreshToken,
+    });
+    await writeConfig({
+      accessToken: out.accessToken,
+      refreshToken: out.refreshToken,
+      expiresAt: out.expiresAt,
+    });
+    config = await readConfig();
+    return true;
+  } catch (err) {
+    if (err instanceof RefreshError && err.status === 400) {
+      // Refresh token itself is stale — user must regrab bundle.
+      return false;
+    }
+    return false;
   }
 }
 
 async function onGetSolution(): Promise<void> {
   if (state.kind !== 'ready') return;
-  if (!config.token) {
-    state = { kind: 'error', message: 'No access token set. Open Config and paste your token.' };
+  if (!config.accessToken) {
+    state = { kind: 'error', message: 'No access token. Paste a session bundle in Config.' };
     render();
     return;
   }
   const apiBaseUrl = config.apiBaseUrl ?? 'http://localhost:3001';
   const problem = state.problem;
-  state = { kind: 'fetching-answer', problem };
-  render();
 
-  try {
-    const out = await fetchCodingAnswer({
-      apiBaseUrl,
-      token: config.token,
-      problem: {
-        ...(problem.title ? { title: problem.title } : {}),
-        ...(problem.description ? { description: problem.description } : {}),
-        ...(problem.examples ? { examples: problem.examples } : {}),
-        ...(problem.constraints ? { constraints: problem.constraints } : {}),
-        ...(problem.difficulty ? { difficulty: problem.difficulty } : {}),
-        rawText: problem.rawText,
-      },
-    });
+  const run = async (): Promise<
+    { ok: true; answer: string; provider: string; latencyMs: number } | { ok: false; err: unknown }
+  > => {
+    state = { kind: 'fetching-answer', problem, answer: '', provider: '' };
+    render();
+    try {
+      let accum = '';
+      let provider = '';
+      let latencyMs = 0;
+      for await (const ev of streamCodingAnswer({
+        apiBaseUrl,
+        token: config.accessToken!,
+        problem: {
+          ...(problem.title ? { title: problem.title } : {}),
+          ...(problem.description ? { description: problem.description } : {}),
+          ...(problem.examples ? { examples: problem.examples } : {}),
+          ...(problem.constraints ? { constraints: problem.constraints } : {}),
+          ...(problem.difficulty ? { difficulty: problem.difficulty } : {}),
+          rawText: problem.rawText,
+        },
+      })) {
+        if (ev.kind === 'start') {
+          provider = ev.provider;
+          state = { kind: 'fetching-answer', problem, answer: '', provider };
+          render();
+        } else if (ev.kind === 'delta') {
+          accum += ev.text;
+          state = { kind: 'fetching-answer', problem, answer: accum, provider };
+          render();
+        } else if (ev.kind === 'done') {
+          latencyMs = ev.latencyMs;
+          return { ok: true, answer: accum, provider: ev.provider, latencyMs };
+        } else if (ev.kind === 'error') {
+          return { ok: false, err: new Error(ev.message) };
+        }
+      }
+      return { ok: true, answer: accum, provider, latencyMs };
+    } catch (err) {
+      return { ok: false, err };
+    }
+  };
+
+  let result = await run();
+  if (!result.ok && result.err instanceof ApiError && result.err.kind === 'auth') {
+    // One-shot retry after refresh.
+    const refreshed = await tryRefresh();
+    if (refreshed) result = await run();
+  }
+  if (result.ok) {
     state = {
       kind: 'answered',
       problem,
-      answer: out.answer,
-      provider: out.provider,
-      latencyMs: out.latencyMs,
+      answer: result.answer,
+      provider: result.provider,
+      latencyMs: result.latencyMs,
     };
     render();
-  } catch (err) {
-    const msg = err instanceof ApiError
+    return;
+  }
+  const err = result.err;
+  const msg =
+    err instanceof ApiError
       ? err.kind === 'auth'
-        ? 'Token rejected. Grab a fresh one from /app/settings.'
+        ? 'Token rejected and refresh failed. Regrab session JSON from /app/settings.'
         : err.message
       : err instanceof Error
         ? err.message
         : String(err);
-    state = { kind: 'error', message: msg };
-    render();
-  }
+  state = { kind: 'error', message: msg };
+  render();
+}
+
+function showConfigMessage(msg: string): void {
+  els.configMessage.textContent = msg;
+  setTimeout(() => {
+    if (els.configMessage.textContent === msg) els.configMessage.textContent = '';
+  }, 3_000);
 }
 
 function render(): void {
-  const hasToken = !!config.token;
-  els.status.textContent = hasToken ? 'signed in' : 'no token';
+  const hasToken = !!config.accessToken;
+  const canRefresh = !!(config.refreshToken && config.supabaseUrl && config.supabaseAnonKey);
+  els.status.textContent = hasToken
+    ? canRefresh
+      ? 'signed in'
+      : 'signed in (no auto-refresh)'
+    : 'no session';
 
   // Problem section
   if (state.kind === 'ready' || state.kind === 'fetching-answer' || state.kind === 'answered') {
@@ -159,7 +281,7 @@ function render(): void {
     els.problemTitle.textContent = p.title;
     els.problemDifficulty.textContent = p.difficulty ?? '';
     els.problemDifficulty.className = 'pill ' + (p.difficulty?.toLowerCase() ?? '');
-    els.problemSlug.textContent = p.slug ? `/problems/${p.slug}` : '';
+    els.problemSlug.textContent = p.slug ? `/${p.slug}` : '';
     els.getSolution.disabled = state.kind === 'fetching-answer' || !hasToken;
     els.getSolution.textContent = state.kind === 'fetching-answer' ? 'Thinking\u2026' : 'Get solution';
   } else {
@@ -173,10 +295,16 @@ function render(): void {
           : 'Get solution';
   }
 
-  // Answer
+  // Answer — show while streaming too, so the user watches it land.
   if (state.kind === 'answered') {
     els.answerSection.hidden = false;
     els.answerMeta.textContent = `${state.provider} \u00b7 ${state.latencyMs} ms`;
+    els.answerText.textContent = state.answer;
+  } else if (state.kind === 'fetching-answer' && state.answer.length > 0) {
+    els.answerSection.hidden = false;
+    els.answerMeta.textContent = state.provider
+      ? `${state.provider} \u00b7 streaming\u2026`
+      : 'streaming\u2026';
     els.answerText.textContent = state.answer;
   } else {
     els.answerSection.hidden = true;
