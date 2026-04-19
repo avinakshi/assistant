@@ -45,6 +45,13 @@ jobs:
           NODE_ENV: test
           LOG_LEVEL: error
 
+      # Build every TS/JS workspace. Catches module-resolution + emit problems that
+      # typecheck misses (e.g. extension's esbuild bundling regressions, Next route
+      # compile issues, renderer's vite build). Skip audio-core — handled by the Rust
+      # job below.
+      - name: Build (excluding audio-core)
+        run: pnpm -r --filter '!@repo/audio-core' build
+
   rust-audio-core:
     strategy:
       fail-fast: false

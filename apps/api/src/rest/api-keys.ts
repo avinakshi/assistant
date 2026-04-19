@@ -12,10 +12,15 @@ import { z } from 'zod';
 import { authenticateWsToken } from '../ws/auth';
 import { getSupabaseAdmin } from '../lib/supabase';
 import { generateApiKey } from '../lib/api-keys';
+import { PerUserRateLimiter } from '../lib/rate-limiter';
 
 const CreateSchema = z.object({
   name: z.string().trim().min(1).max(80),
 });
+
+// 5 new keys per user per hour. Prevents abuse; still plenty for real workflows
+// (user creates one per device — laptop, phone, server — and is done).
+const createKeyLimiter = new PerUserRateLimiter(5, 60 * 60 * 1_000);
 
 export const apiKeysRoutePlugin: FastifyPluginAsync = async (app: FastifyInstance) => {
   // Small shared auth helper scoped to this plugin — extracts the JWT + enforces the
@@ -37,6 +42,14 @@ export const apiKeysRoutePlugin: FastifyPluginAsync = async (app: FastifyInstanc
   app.post('/api/keys', async (req, reply) => {
     const auth = await requireJwt(req);
     if (!auth.ok) return reply.code(401).send({ error: 'jwt required' });
+
+    const gate = createKeyLimiter.tryConsume(auth.userId);
+    if (!gate.allowed) {
+      const retrySec = Math.ceil(gate.retryAfterMs / 1_000);
+      reply.header('retry-after', String(retrySec));
+      return reply.code(429).send({ error: 'rate limited', retryAfterSeconds: retrySec });
+    }
+
     const parsed = CreateSchema.safeParse(req.body);
     if (!parsed.success) {
       return reply.code(400).send({

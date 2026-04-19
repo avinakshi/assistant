@@ -74,8 +74,8 @@ export default function LandingPage() {
         <span>© Interview Copilot</span>
         <nav className="flex gap-4">
           <Link href="/pricing">Pricing</Link>
-          <a href="/privacy">Privacy</a>
-          <a href="/terms">Terms</a>
+          <Link href="/privacy">Privacy</Link>
+          <Link href="/terms">Terms</Link>
         </nav>
       </footer>
     </main>

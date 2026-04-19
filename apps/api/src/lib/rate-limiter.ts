@@ -31,3 +31,39 @@ export class SlidingWindowLimiter implements RateLimiter {
     return { allowed: true };
   }
 }
+
+/**
+ * Per-user rate limiter — maps an opaque key (usually a userId) to its own sliding
+ * window. Shared instance across the HTTP request lifecycle of the api process.
+ *
+ * We prune inactive buckets lazily on access rather than running a sweeper: a user who
+ * stops calling just drops out on their next hit check (there's nothing to evict between
+ * hits since the underlying array is already bounded by `capacity`).
+ *
+ * This is an in-process limiter. For horizontal scaling we'd move to Redis or a
+ * token-bucket service, but at Phase 11 Beta scale (single api process) this is enough
+ * and avoids an external dependency.
+ */
+export class PerUserRateLimiter {
+  private readonly buckets = new Map<string, SlidingWindowLimiter>();
+
+  constructor(
+    private readonly capacity: number,
+    private readonly windowMs: number,
+    private readonly now: () => number = Date.now,
+  ) {}
+
+  tryConsume(key: string): { allowed: true } | { allowed: false; retryAfterMs: number } {
+    let bucket = this.buckets.get(key);
+    if (!bucket) {
+      bucket = new SlidingWindowLimiter(this.capacity, this.windowMs, this.now);
+      this.buckets.set(key, bucket);
+    }
+    return bucket.tryConsume();
+  }
+
+  /** For tests — reset all buckets. */
+  reset(): void {
+    this.buckets.clear();
+  }
+}

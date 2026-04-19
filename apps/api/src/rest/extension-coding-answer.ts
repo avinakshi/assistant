@@ -15,6 +15,11 @@ import { ClaudeProvider, GeminiProvider, LlmRouter } from '@repo/llm-router';
 import { authenticateWsToken } from '../ws/auth';
 import { config } from '../config';
 import { logger } from '../logger';
+import { PerUserRateLimiter } from '../lib/rate-limiter';
+
+// 10 answers per user per rolling minute. Prevents a stuck extension tab from burning
+// Gemini credits. Matches the WS OCR rate the orchestrator already enforces elsewhere.
+const codingAnswerLimiter = new PerUserRateLimiter(10, 60_000);
 
 const CodingProblemSchema = z.object({
   title: z.string().max(300).optional(),
@@ -52,6 +57,18 @@ export const extensionCodingAnswerPlugin: FastifyPluginAsync = async (app: Fasti
     const auth = await authenticateWsToken(token);
     if (auth.kind !== 'user') {
       return reply.code(401).send({ error: 'jwt required' });
+    }
+
+    // Per-user HTTP rate limit. Emits a Retry-After (seconds) header + 429 so the
+    // extension can back off cleanly.
+    const gate = codingAnswerLimiter.tryConsume(auth.userId);
+    if (!gate.allowed) {
+      const retrySec = Math.ceil(gate.retryAfterMs / 1_000);
+      reply.header('retry-after', String(retrySec));
+      return reply.code(429).send({
+        error: 'rate limited',
+        retryAfterSeconds: retrySec,
+      });
     }
 
     // Validate body.
