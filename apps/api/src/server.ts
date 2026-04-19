@@ -5,6 +5,7 @@ import { echoRoutePlugin } from './ws/echo-handler';
 import { sessionRoutePlugin } from './ws/session-handler';
 import { practiceSttRoutePlugin } from './ws/practice-stt-handler';
 import { prefsRoutePlugin } from './rest/prefs';
+import { extensionCodingAnswerPlugin } from './rest/extension-coding-answer';
 
 export async function buildServer(): Promise<FastifyInstance> {
   const app = Fastify({
@@ -30,6 +31,9 @@ export async function buildServer(): Promise<FastifyInstance> {
 
   // Small HTTP surfaces.
   await app.register(prefsRoutePlugin);
+  // Chrome extension's coding-answer endpoint. Needs Gemini configured to actually
+  // answer; endpoint is registered either way so calls fail with a meaningful 503.
+  await app.register(extensionCodingAnswerPlugin);
 
   await app.register(echoRoutePlugin);
 

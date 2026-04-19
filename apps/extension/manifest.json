@@ -1,0 +1,31 @@
+{
+  "manifest_version": 3,
+  "name": "Interview Copilot",
+  "version": "0.1.0",
+  "description": "Extracts coding problems from LeetCode and fetches AI solutions via your Interview Copilot account.",
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Interview Copilot"
+  },
+  "permissions": ["storage", "activeTab"],
+  "host_permissions": [
+    "https://leetcode.com/*",
+    "http://localhost:3001/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://leetcode.com/problems/*"],
+      "js": ["content-leetcode.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "16": "icon-16.png",
+    "32": "icon-32.png",
+    "128": "icon-128.png"
+  }
+}

@@ -1,0 +1,103 @@
+:root {
+  --ink: #1a1a1a;
+  --ink-500: #6b6b6b;
+  --brand: #4f46e5;
+  --brand-700: #3730a3;
+  --ink-50: #f5f5f5;
+  --ink-100: #e5e5e5;
+  --red: #dc2626;
+  --red-50: #fef2f2;
+  --amber: #b45309;
+  --amber-50: #fffbeb;
+  --emerald: #059669;
+  --emerald-50: #ecfdf5;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 12px;
+  width: 380px;
+  font: 13px/1.45 system-ui, -apple-system, 'Segoe UI', sans-serif;
+  color: var(--ink);
+  background: #ffffff;
+}
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 8px;
+}
+header strong { font-size: 14px; }
+#status { font-size: 11px; color: var(--ink-500); }
+section { margin-top: 10px; }
+details summary { cursor: pointer; font-size: 12px; color: var(--ink-500); }
+details[open] summary { margin-bottom: 6px; }
+label {
+  display: block;
+  font-size: 11px;
+  color: var(--ink-500);
+  margin-top: 6px;
+}
+input, textarea {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  padding: 6px 8px;
+  font: inherit;
+  color: var(--ink);
+  border: 1px solid var(--ink-100);
+  border-radius: 4px;
+  background: #fff;
+}
+textarea { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; }
+.config-actions { display: flex; gap: 6px; margin-top: 8px; }
+button {
+  padding: 6px 10px;
+  font: inherit;
+  border: 0;
+  border-radius: 4px;
+  background: var(--brand);
+  color: #fff;
+  cursor: pointer;
+}
+button:hover:not(:disabled) { background: var(--brand-700); }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+button.secondary {
+  background: #fff;
+  color: var(--ink);
+  border: 1px solid var(--ink-100);
+}
+.problem-header { display: flex; gap: 6px; align-items: center; }
+#problem-title { font-weight: 600; }
+.pill {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 9999px;
+  background: var(--ink-50);
+}
+.pill.easy   { background: var(--emerald-50); color: var(--emerald); }
+.pill.medium { background: var(--amber-50); color: var(--amber); }
+.pill.hard   { background: var(--red-50); color: var(--red); }
+#problem-slug { font-size: 11px; color: var(--ink-500); margin: 4px 0 0; }
+#get-solution { width: 100%; margin-top: 10px; padding: 8px; }
+#answer-section { border-top: 1px solid var(--ink-100); padding-top: 8px; }
+#answer-meta { font-size: 11px; color: var(--ink-500); margin-bottom: 6px; }
+#answer-text {
+  font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  margin: 0;
+  max-height: 360px;
+  overflow-y: auto;
+  background: var(--ink-50);
+  padding: 8px;
+  border-radius: 4px;
+}
+#error-section {
+  border: 1px solid #fecaca;
+  background: var(--red-50);
+  color: var(--red);
+  padding: 8px;
+  border-radius: 4px;
+  font-size: 12px;
+}

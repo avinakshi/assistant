@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Interview Copilot</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header>
+      <strong>Interview Copilot</strong>
+      <span id="status"></span>
+    </header>
+
+    <section id="config-section">
+      <details>
+        <summary>Config</summary>
+        <label>
+          API URL
+          <input id="api-url" type="url" placeholder="http://localhost:3001" />
+        </label>
+        <label>
+          Access token (paste from /app/settings)
+          <textarea id="token" rows="3" placeholder="eyJhbGciOi..."></textarea>
+        </label>
+        <div class="config-actions">
+          <button id="save-config" type="button">Save</button>
+          <button id="clear-token" type="button" class="secondary">Clear token</button>
+        </div>
+      </details>
+    </section>
+
+    <section id="problem-section" hidden>
+      <div class="problem-header">
+        <span id="problem-title"></span>
+        <span id="problem-difficulty" class="pill"></span>
+      </div>
+      <p id="problem-slug"></p>
+    </section>
+
+    <button id="get-solution" type="button" disabled>Get solution</button>
+
+    <section id="answer-section" hidden>
+      <div id="answer-meta"></div>
+      <pre id="answer-text"></pre>
+    </section>
+
+    <section id="error-section" hidden>
+      <div id="error-text"></div>
+    </section>
+
+    <script src="popup.js"></script>
+  </body>
+</html>
