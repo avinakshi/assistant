@@ -33,5 +33,11 @@
     "16": "icon-16.png",
     "32": "icon-32.png",
     "128": "icon-128.png"
-  }
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["callback.html", "callback.js", "popup.css"],
+      "matches": ["http://localhost:3000/*", "https://*/*"]
+    }
+  ]
 }

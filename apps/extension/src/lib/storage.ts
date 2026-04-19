@@ -16,14 +16,39 @@ export interface ExtensionConfig {
   readonly supabaseUrl?: string;
   readonly supabaseAnonKey?: string;
   readonly apiBaseUrl?: string;
+  /** Web app base URL — used by Sign-in to open /login?from=extension. */
+  readonly webBaseUrl?: string;
 }
 
 const DEFAULT_API = 'http://localhost:3001';
+const DEFAULT_WEB = 'http://localhost:3000';
+
+/**
+ * Generate a cryptographically random 128-bit state nonce for the OAuth handshake.
+ * Used by the popup when opening the web sign-in URL; the callback page must see the
+ * same value or it refuses to persist the session.
+ */
+export async function setPendingLogin(nonce: string): Promise<void> {
+  return new Promise((resolve) => {
+    chrome.storage.local.set(
+      { pendingLogin: { nonce, createdAt: Date.now() } },
+      () => resolve(),
+    );
+  });
+}
 
 export async function readConfig(): Promise<ExtensionConfig> {
   return new Promise((resolve) => {
     chrome.storage.local.get(
-      ['accessToken', 'refreshToken', 'expiresAt', 'supabaseUrl', 'supabaseAnonKey', 'apiBaseUrl'],
+      [
+        'accessToken',
+        'refreshToken',
+        'expiresAt',
+        'supabaseUrl',
+        'supabaseAnonKey',
+        'apiBaseUrl',
+        'webBaseUrl',
+      ],
       (items) => {
         const accessToken =
           typeof items['accessToken'] === 'string' ? (items['accessToken'] as string) : undefined;
@@ -39,6 +64,8 @@ export async function readConfig(): Promise<ExtensionConfig> {
             : undefined;
         const apiBaseUrl =
           typeof items['apiBaseUrl'] === 'string' ? (items['apiBaseUrl'] as string) : DEFAULT_API;
+        const webBaseUrl =
+          typeof items['webBaseUrl'] === 'string' ? (items['webBaseUrl'] as string) : DEFAULT_WEB;
         resolve({
           ...(accessToken ? { accessToken } : {}),
           ...(refreshToken ? { refreshToken } : {}),
@@ -46,6 +73,7 @@ export async function readConfig(): Promise<ExtensionConfig> {
           ...(supabaseUrl ? { supabaseUrl } : {}),
           ...(supabaseAnonKey ? { supabaseAnonKey } : {}),
           apiBaseUrl,
+          webBaseUrl,
         });
       },
     );
@@ -62,6 +90,7 @@ export async function writeConfig(cfg: ExtensionConfig): Promise<void> {
         ...(cfg.supabaseUrl !== undefined ? { supabaseUrl: cfg.supabaseUrl } : {}),
         ...(cfg.supabaseAnonKey !== undefined ? { supabaseAnonKey: cfg.supabaseAnonKey } : {}),
         ...(cfg.apiBaseUrl !== undefined ? { apiBaseUrl: cfg.apiBaseUrl } : {}),
+        ...(cfg.webBaseUrl !== undefined ? { webBaseUrl: cfg.webBaseUrl } : {}),
       },
       () => resolve(),
     );

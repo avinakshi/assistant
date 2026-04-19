@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { PersistTranscriptsToggle } from './persist-toggle';
 import { CopyTokenCard } from './copy-token-card';
+import { ApiKeysCard } from './api-keys-card';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,6 +31,7 @@ export default async function SettingsPage() {
       <section className="mt-6 flex flex-col gap-4">
         <PersistTranscriptsToggle initial={persistDefault} />
         <CopyTokenCard />
+        <ApiKeysCard />
       </section>
     </div>
   );

@@ -63,12 +63,32 @@ describe('authenticateWsToken', () => {
     expect(r).toEqual({ kind: 'denied', reason: 'jwt-invalid' });
   });
 
-  it('returns { kind: "user" } for a valid JWT verified by Supabase', async () => {
+  it('returns { kind: "user", via: "jwt" } for a valid JWT verified by Supabase', async () => {
     const fake = userOk('uuid-42', 'u@e.com');
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const r = await authenticateWsToken(JWT_LIKE, { supabase: fake as any });
-    expect(r).toEqual({ kind: 'user', userId: 'uuid-42', email: 'u@e.com' });
+    expect(r).toEqual({ kind: 'user', userId: 'uuid-42', email: 'u@e.com', via: 'jwt' });
     expect(fake.auth.getUser).toHaveBeenCalledWith(JWT_LIKE);
+  });
+
+  it('routes api-key-shaped tokens through verifyApiKey', async () => {
+    // Mock out the supabase client returning a matching row via .from().select()... chain.
+    // verifyApiKey reads from api_keys; we only need maybeSingle() to resolve.
+    const maybeSingle = vi.fn().mockResolvedValue({
+      data: { id: 'key-id', user_id: 'uuid-7', revoked_at: null },
+      error: null,
+    });
+    const eq = vi.fn().mockReturnValue({ maybeSingle });
+    const select = vi.fn().mockReturnValue({ eq });
+    const update = vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) });
+    const from = vi.fn().mockReturnValue({ select, update });
+    const fake = { from, auth: { getUser: vi.fn() } };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const r = await authenticateWsToken('sk-ic-abcdefghijklmnopqrst', { supabase: fake as any });
+    expect(r).toEqual({ kind: 'user', userId: 'uuid-7', via: 'api-key' });
+    expect(from).toHaveBeenCalledWith('api_keys');
+    // getUser is the JWT path — must NOT be called for an API key.
+    expect(fake.auth.getUser).not.toHaveBeenCalled();
   });
 
   it('returns denied when Supabase says the JWT is invalid', async () => {

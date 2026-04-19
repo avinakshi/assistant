@@ -25,6 +25,7 @@ const entries = {
   background: 'src/background.ts',
   'content-leetcode': 'src/content-leetcode.ts',
   'content-hackerrank': 'src/content-hackerrank.ts',
+  callback: 'src/callback.ts',
 };
 
 for (const [name, entry] of Object.entries(entries)) {
@@ -40,9 +41,10 @@ for (const [name, entry] of Object.entries(entries)) {
   });
 }
 
-// Copy popup.html + popup.css.
+// Copy popup.html + popup.css + callback.html (callback reuses popup.css).
 await copyFile(resolve(srcDir, 'popup.html'), resolve(distDir, 'popup.html'));
 await copyFile(resolve(srcDir, 'popup.css'), resolve(distDir, 'popup.css'));
+await copyFile(resolve(srcDir, 'callback.html'), resolve(distDir, 'callback.html'));
 
 // Copy manifest.
 await copyFile(resolve(__dirname, 'manifest.json'), resolve(distDir, 'manifest.json'));

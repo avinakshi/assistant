@@ -15,9 +15,16 @@ export function LoginForm() {
   // Phase 6e: when the desktop app opens us with ?from=desktop&state=<nonce>, thread
   // those two params through the Supabase round-trip so the callback route knows to
   // redirect to ic://auth-callback?… instead of /app.
+  // Phase 10c: same story for the Chrome extension, except the callback redirects to
+  // chrome-extension://<id>/callback.html instead of ic://.
   const from = params.get('from');
   const state = params.get('state');
+  const extensionId = params.get('extension_id');
   const isDesktop = from === 'desktop' && typeof state === 'string' && state.length > 0;
+  const isExtension =
+    from === 'extension' &&
+    typeof state === 'string' && state.length > 0 &&
+    typeof extensionId === 'string' && /^[a-p]{32}$/.test(extensionId);
 
   const buildCallbackUrl = () => {
     const u = new URL('/auth/callback', window.location.origin);
@@ -25,6 +32,10 @@ export function LoginForm() {
     if (isDesktop) {
       u.searchParams.set('from', 'desktop');
       u.searchParams.set('state', state);
+    } else if (isExtension && state && extensionId) {
+      u.searchParams.set('from', 'extension');
+      u.searchParams.set('state', state);
+      u.searchParams.set('extension_id', extensionId);
     }
     return u.toString();
   };
@@ -59,6 +70,7 @@ export function LoginForm() {
         <div className="mt-1">
           We sent a login link to {email}.
           {isDesktop && ' Click it and you\u2019ll be returned to the Interview Copilot app.'}
+          {isExtension && ' Click it and the Chrome extension will pick up the session automatically.'}
         </div>
       </div>
     );

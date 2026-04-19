@@ -11,6 +11,20 @@
       <span id="status"></span>
     </header>
 
+    <section id="signin-section" hidden>
+      <div class="signin-hint">
+        Not signed in. Click below to open the web app and sign in \u2014 tokens come back
+        to the extension automatically.
+      </div>
+      <label>
+        Web URL
+        <input id="web-url" type="url" placeholder="http://localhost:3000" />
+      </label>
+      <div class="config-actions">
+        <button id="sign-in" type="button">Sign in</button>
+      </div>
+    </section>
+
     <section id="config-section">
       <details>
         <summary>Config</summary>

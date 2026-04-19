@@ -14,6 +14,7 @@ import {
   writeConfig,
   clearSession,
   parseSessionBundle,
+  setPendingLogin,
   type ExtensionConfig,
 } from './lib/storage';
 import { streamCodingAnswer, ApiError } from './lib/api';
@@ -31,6 +32,9 @@ type State =
 
 const els = {
   status: document.getElementById('status') as HTMLSpanElement,
+  signinSection: document.getElementById('signin-section') as HTMLElement,
+  webUrl: document.getElementById('web-url') as HTMLInputElement,
+  signIn: document.getElementById('sign-in') as HTMLButtonElement,
   apiUrl: document.getElementById('api-url') as HTMLInputElement,
   bundle: document.getElementById('bundle') as HTMLTextAreaElement,
   saveConfig: document.getElementById('save-config') as HTMLButtonElement,
@@ -54,7 +58,10 @@ let config: ExtensionConfig = {};
 async function main(): Promise<void> {
   config = await readConfig();
   els.apiUrl.value = config.apiBaseUrl ?? '';
+  els.webUrl.value = config.webBaseUrl ?? '';
   render();
+
+  els.signIn.addEventListener('click', () => void onSignIn());
 
   els.saveConfig.addEventListener('click', async () => {
     const apiBaseUrl = els.apiUrl.value.trim();
@@ -150,6 +157,28 @@ async function loadProblemFromActiveTab(): Promise<void> {
     };
     render();
   }
+}
+
+async function onSignIn(): Promise<void> {
+  // Persist the chosen web URL (so next popup open defaults to the same one).
+  const webBaseUrl = els.webUrl.value.trim() || 'http://localhost:3000';
+  await writeConfig({ webBaseUrl });
+  config = await readConfig();
+
+  // 128-bit nonce so the callback can verify this wasn't triggered by a malicious page.
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  const nonce = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  await setPendingLogin(nonce);
+
+  const extensionId = chrome.runtime.id;
+  const url = new URL('/login', webBaseUrl);
+  url.searchParams.set('from', 'extension');
+  url.searchParams.set('extension_id', extensionId);
+  url.searchParams.set('state', nonce);
+
+  // Open in a new tab; the callback page closes itself once done.
+  await chrome.tabs.create({ url: url.toString() });
+  window.close();
 }
 
 async function tryRefresh(): Promise<boolean> {
@@ -273,6 +302,10 @@ function render(): void {
       ? 'signed in'
       : 'signed in (no auto-refresh)'
     : 'no session';
+
+  // Show the Sign-in section only when we have no session at all. Config panel stays
+  // accessible either way for users who prefer to paste the JSON bundle manually.
+  els.signinSection.hidden = hasToken;
 
   // Problem section
   if (state.kind === 'ready' || state.kind === 'fetching-answer' || state.kind === 'answered') {

@@ -1,25 +1,27 @@
 /**
- * WebSocket authentication — resolves the `?token=` query param into a concrete identity.
+ * WebSocket / HTTP authentication — resolves the token into a concrete identity.
  *
- * Two supported modes, chosen at runtime based on what's configured:
+ * Three supported modes, in resolution order:
+ *
+ *   - API key (Phase 10c): tokens shaped `sk-ic-<20-base32>` are hashed and looked up in
+ *     the api_keys table. Live per-user, can be revoked independently of Supabase
+ *     sessions. Ideal for the Chrome extension and future headless clients.
  *
  *   - JWT (Phase 6f): if the Supabase admin client is available, tokens that look like
- *     JWTs are verified via `supabase.auth.getUser(token)` which calls `/auth/v1/user`.
- *     Returns the user's id.
+ *     JWTs are verified via `supabase.auth.getUser(token)`. Returns the user's id.
  *
  *   - shared-secret (legacy / CI): any token matching WS_SHARED_SECRET is accepted
  *     anonymously. Used by integration tests that don't spin up Supabase.
- *
- * Anything else is rejected.
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { config } from '../config';
 import { getSupabaseAdmin } from '../lib/supabase';
+import { looksLikeApiKey, verifyApiKey } from '../lib/api-keys';
 
 export type WsAuthResult =
-  | { kind: 'user'; userId: string; email?: string }
+  | { kind: 'user'; userId: string; email?: string; via?: 'jwt' | 'api-key' }
   | { kind: 'shared-secret' }
-  | { kind: 'denied'; reason: 'missing-token' | 'bad-token' | 'jwt-invalid' };
+  | { kind: 'denied'; reason: 'missing-token' | 'bad-token' | 'jwt-invalid' | 'api-key-invalid' };
 
 export interface WsAuthDeps {
   /** Override for tests. Defaults to the process-wide admin client. */
@@ -46,11 +48,22 @@ export async function authenticateWsToken(
     return { kind: 'shared-secret' };
   }
 
+  const supabase = deps.supabase === undefined ? getSupabaseAdmin() : deps.supabase;
+
+  // API key path — structurally disjoint from JWTs so order doesn't matter.
+  if (looksLikeApiKey(rawToken)) {
+    if (!supabase) {
+      return { kind: 'denied', reason: 'api-key-invalid' };
+    }
+    const result = await verifyApiKey(supabase, rawToken);
+    if (!result) return { kind: 'denied', reason: 'api-key-invalid' };
+    return { kind: 'user', userId: result.userId, via: 'api-key' };
+  }
+
   if (!looksLikeJwt(rawToken)) {
     return { kind: 'denied', reason: 'bad-token' };
   }
 
-  const supabase = deps.supabase === undefined ? getSupabaseAdmin() : deps.supabase;
   if (!supabase) {
     // JWT-shaped token but we have no Supabase client to verify it. Treat as denied so we
     // never "fail open" on a forged token.
@@ -64,6 +77,7 @@ export async function authenticateWsToken(
   return {
     kind: 'user',
     userId: data.user.id,
+    via: 'jwt',
     ...(data.user.email ? { email: data.user.email } : {}),
   };
 }
