@@ -14,10 +14,13 @@ describe('StubSineAudioSource', () => {
     source.onFrame((s, t) => frames.push({ samples: s, ts: t }));
 
     await source.start();
-    await new Promise((r) => setTimeout(r, AUDIO_FRAME_DURATION_MS * 6));
+    // Wait ~12 frames (240 ms @ 50 fps). Windows setTimeout jitter occasionally lets a
+    // 6-frame wait land with only 2 frames delivered, flaking the assertion below. 12 is
+    // enough headroom that even a 15ms timer slip still produces ≥ 5 frames.
+    await new Promise((r) => setTimeout(r, AUDIO_FRAME_DURATION_MS * 12));
     await source.stop();
 
-    expect(frames.length).toBeGreaterThan(2);
+    expect(frames.length).toBeGreaterThanOrEqual(5);
     for (const f of frames) expect(f.samples.length).toBe(AUDIO_SAMPLES_PER_FRAME);
 
     for (let i = 1; i < frames.length; i++) {

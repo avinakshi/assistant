@@ -38,10 +38,26 @@ export const sessionRoutePlugin: FastifyPluginAsync = async (app: FastifyInstanc
 
   // @ts-expect-error — @fastify/websocket@11.2.0 + Fastify 5 type-merge bug, same as /ws/echo.
   app.get('/ws/session', { websocket: true }, async (socket: WebSocket, req: FastifyRequest) => {
+    // CRITICAL: buffer any message that arrives *during* the async auth below. The
+    // browser's `ws.onopen` fires the instant the TCP upgrade completes and the client
+    // ships `session.start` before this handler's async auth has resolved. Without
+    // this buffer, Fastify/ws drops those early messages on the floor and the session
+    // lives its whole life in `awaiting-start` — exactly the Phase-13 "transcripts
+    // never appear" bug we spent an afternoon chasing.
+    const earlyTextBuffer: Buffer[] = [];
+    const earlyBinaryBuffer: Buffer[] = [];
+    const bufferDuringAuth = (data: Buffer, isBinary: boolean): void => {
+      if (isBinary) earlyBinaryBuffer.push(data);
+      else earlyTextBuffer.push(data);
+    };
+    const rawListener = (raw: Buffer, isBinary: boolean): void => bufferDuringAuth(raw, isBinary);
+    socket.on('message', rawListener);
+
     const url = new URL(req.url, `http://${req.headers.host ?? 'localhost'}`);
     const token = url.searchParams.get('token');
     const auth = await authenticateWsToken(token);
     if (auth.kind === 'denied') {
+      socket.off('message', rawListener);
       logger.warn({ ip: req.ip, reason: auth.reason }, 'session auth failed');
       try {
         socket.send(encodeServerMessage({ type: 'error', code: 'AUTH', message: 'bad token' }));
@@ -58,6 +74,8 @@ export const sessionRoutePlugin: FastifyPluginAsync = async (app: FastifyInstanc
         ocr: ocrProvider ? 'enabled' : 'disabled',
         authMode: auth.kind,
         userId: auth.kind === 'user' ? auth.userId : undefined,
+        bufferedText: earlyTextBuffer.length,
+        bufferedBinary: earlyBinaryBuffer.length,
       },
       'session opened',
     );
@@ -79,7 +97,15 @@ export const sessionRoutePlugin: FastifyPluginAsync = async (app: FastifyInstanc
         deps.supabase = supabase;
       }
     }
-    new SessionOrchestrator(socket, deps);
+    // Unhook our buffer listener BEFORE the orchestrator attaches its own, so the
+    // orchestrator sees a clean event stream. Then replay everything we buffered in
+    // the exact order it arrived.
+    socket.off('message', rawListener);
+    const orch = new SessionOrchestrator(socket, deps);
+    // Replay: text first so `session.start` is always processed before any audio
+    // binaries that might have been queued alongside it.
+    for (const buf of earlyTextBuffer) orch.replayMessage(buf, false);
+    for (const buf of earlyBinaryBuffer) orch.replayMessage(buf, true);
   });
 };
 

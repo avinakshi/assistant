@@ -15,7 +15,7 @@
 
 export type ProviderName = 'gemini' | 'claude' | 'gpt-5' | 'gpt-4.1';
 
-export type AnswerMode = 'behavioral' | 'coding' | 'system_design' | 'auto';
+export type AnswerMode = 'behavioral' | 'coding' | 'system_design' | 'technical' | 'auto';
 
 /**
  * Structural mirror of `@repo/ocr.CodingProblem`. Duplicated here so llm-router doesn't
@@ -70,6 +70,13 @@ export interface AnswerContext {
     readonly question: string;
     readonly answer: string;
   };
+  /**
+   * Phase 13d. Free-form candidate-supplied bias ("emphasize leadership examples",
+   * "target Google SWE L6", "answer in Hindi"). Rendered as a prominent directive in
+   * the user message so the model treats it as a hard constraint, not flavor text.
+   * Empty / missing means "no extra instructions" — same as pre-13d behavior.
+   */
+  extraInstructions?: string;
 }
 
 export interface StreamOptions {

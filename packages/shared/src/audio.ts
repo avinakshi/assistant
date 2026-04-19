@@ -15,6 +15,26 @@ export const AUDIO_FRAMES_PER_SECOND = AUDIO_SAMPLE_RATE_HZ / AUDIO_SAMPLES_PER_
 export const AUDIO_FRAME_DURATION_MS =
   (AUDIO_SAMPLES_PER_FRAME / AUDIO_SAMPLE_RATE_HZ) * 1000;
 
+/**
+ * Diarization-mode frame layout (opt-in via `session.start {diarize:true}`). The first
+ * byte tags the source (0 = interviewer / remote audio, 1 = candidate / local mic); the
+ * remaining AUDIO_BYTES_PER_FRAME bytes are the normal PCM16 payload. Total = 641 bytes.
+ * Cheap (~0.15% overhead at 16 kHz) and lets one WS carry both sources in-order.
+ */
+export const AUDIO_SOURCE_TAG_BYTES = 1 as const;
+export const AUDIO_BYTES_PER_FRAME_DIARIZED = AUDIO_BYTES_PER_FRAME + AUDIO_SOURCE_TAG_BYTES;
+export const AUDIO_SOURCE_INTERVIEWER = 0 as const;
+export const AUDIO_SOURCE_CANDIDATE = 1 as const;
+export type AudioSource = 'interviewer' | 'candidate';
+
+export function encodeAudioSourceTag(source: AudioSource): number {
+  return source === 'candidate' ? AUDIO_SOURCE_CANDIDATE : AUDIO_SOURCE_INTERVIEWER;
+}
+
+export function decodeAudioSourceTag(tag: number): AudioSource {
+  return tag === AUDIO_SOURCE_CANDIDATE ? 'candidate' : 'interviewer';
+}
+
 export interface PcmFrame {
   readonly samples: Int16Array;
   readonly timestampNs: bigint;

@@ -103,13 +103,13 @@ function PracticeRowItem({
       <Link href={`/app/practice/${row.id}`} className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <div className="text-sm font-medium text-ink-900">
-            {labelForMode(row.mode)} \u00b7 {new Date(row.started_at).toLocaleString()}
+            {labelForMode(row.mode)} · {new Date(row.started_at).toLocaleString()}
           </div>
           <div className="mt-0.5 text-xs text-ink-500">
-            {status} \u00b7 {dur} {overall ? `\u00b7 overall ${overall}/5` : ''}
+            {status} · {dur} {overall ? `· overall ${overall}/5` : ''}
           </div>
         </div>
-        <span className="text-xs text-brand-600">Open \u2192</span>
+        <span className="text-xs text-brand-600">Open →</span>
       </Link>
     </li>
   );

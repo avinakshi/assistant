@@ -71,8 +71,8 @@ export default async function PracticeSessionPage({
   return (
     <div className="mx-auto max-w-3xl px-6 py-8">
       <div className="mb-4 text-xs text-ink-500">
-        {labelForMode(s.mode)} \u00b7 started {new Date(s.started_at).toLocaleString()}
-        {s.ended_at && ' \u00b7 ended ' + new Date(s.ended_at).toLocaleString()}
+        {labelForMode(s.mode)} · started {new Date(s.started_at).toLocaleString()}
+        {s.ended_at && ' · ended ' + new Date(s.ended_at).toLocaleString()}
       </div>
       <PracticeChat
         sessionId={s.id}

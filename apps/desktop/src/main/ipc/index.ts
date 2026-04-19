@@ -12,6 +12,9 @@ export interface IpcDeps {
   getOverlay: () => BrowserWindow | null;
   /** The live WsClient; screenshots are forwarded over the session stream. */
   getWs: () => WsClient | null;
+  /** Same toggle the Ctrl+Shift+S shortcut fires. Wired from index.ts so the overlay */
+  /** buttons can start/stop listening without requiring a global hotkey. */
+  onToggleListening?: () => void;
   /** Phase 7b — renderer can trigger check + install via IPC. Optional for test setups. */
   onCheckForUpdates?: () => void | Promise<void>;
   onInstallUpdate?: () => void | Promise<void>;
@@ -38,6 +41,29 @@ export function registerIpcHandlers(deps: IpcDeps): void {
   ipcMain.handle(IpcInvokeChannels.SystemHideOverlay, () => {
     const w = deps.getOverlay();
     if (w && !w.isDestroyed()) w.hide();
+  });
+
+  ipcMain.handle(IpcInvokeChannels.SystemMinimizeOverlay, () => {
+    // Intentionally NOT win.minimize() — the overlay window has skipTaskbar=true for
+    // stealth, which means minimize() hides the window with no way to get it back
+    // except the tray menu. Users kept losing the overlay. Collapse instead: shrink
+    // the height to the header strip so the buttons stay clickable. Clicking the
+    // collapse button again (from the renderer) resizes back.
+    const w = deps.getOverlay();
+    if (!w || w.isDestroyed()) return;
+    const [width = 420] = w.getSize();
+    w.setSize(width, 36, false);
+  });
+
+  ipcMain.handle(IpcInvokeChannels.SystemExpandOverlay, () => {
+    const w = deps.getOverlay();
+    if (!w || w.isDestroyed()) return;
+    const [width = 420] = w.getSize();
+    w.setSize(width, 520, false);
+  });
+
+  ipcMain.handle(IpcInvokeChannels.SystemToggleListening, () => {
+    deps.onToggleListening?.();
   });
 
   ipcMain.handle(IpcInvokeChannels.SystemOpenSettings, () => {

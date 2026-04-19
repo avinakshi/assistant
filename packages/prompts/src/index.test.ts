@@ -7,9 +7,11 @@ describe('prompt packs', () => {
     expect(BEHAVIORAL_PROMPT).toMatch(/banned phrases/i);
   });
 
-  it('coding pack enforces think-aloud + code + complexity structure', () => {
-    expect(CODING_PROMPT).toMatch(/think aloud/i);
+  it('coding pack enforces scannable structure (bold headline + code + complexity)', () => {
+    expect(CODING_PROMPT).toMatch(/bold.*headline|bold one-line approach/i);
     expect(CODING_PROMPT).toMatch(/complexity/i);
+    // Explicitly forbids main() + test-harness boilerplate so answers stay tight.
+    expect(CODING_PROMPT).toMatch(/no\s+main|no test cases|no boilerplate/i);
   });
 
   it('system-design pack prescribes clarifying questions + sizing + deep dives', () => {

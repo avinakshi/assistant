@@ -279,7 +279,7 @@ export function PracticeChat(props: Props) {
                 disabled={pending || draft.trim().length === 0}
                 className="rounded-md bg-brand-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {pending ? 'Thinking\u2026' : 'Submit answer'}
+                {pending ? 'Thinking…' : 'Submit answer'}
               </button>
             </div>
           </div>
@@ -294,13 +294,13 @@ export function PracticeChat(props: Props) {
 
       {!props.ended && !awaitingAnswer && (
         <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-          Waiting for the interviewer\u2019s next question\u2026
+          Waiting for the interviewer’s next question…
         </div>
       )}
 
       {props.ended && !props.summary && (
         <div className="rounded-md border border-ink-100 bg-white p-3 text-sm text-ink-700">
-          Generating your review\u2026
+          Generating your review…
         </div>
       )}
     </div>

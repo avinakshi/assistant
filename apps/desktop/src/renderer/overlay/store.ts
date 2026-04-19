@@ -63,10 +63,14 @@ export const useOverlayStore = create<OverlayState>((set) => ({
   updater: null,
 
   setConnected: (connected) => set({ connected }),
+  // Any event from the main process proves the IPC bridge is alive. In session mode
+  // (our real product flow) echo.stats never fires, so relying solely on pushStats
+  // left the overlay stuck at "disconnected". Every incoming event now flips the flag.
   pushStats: (latestStats) => set({ connected: true, latestStats }),
-  pushPartial: (p) => set({ transcriptPartial: p.text }),
+  pushPartial: (p) => set({ connected: true, transcriptPartial: p.text }),
   pushFinal: (p) =>
     set((s) => ({
+      connected: true,
       transcriptPartial: '',
       transcriptFinals: [
         ...s.transcriptFinals.slice(-(MAX_FINALS - 1)),
@@ -78,7 +82,7 @@ export const useOverlayStore = create<OverlayState>((set) => ({
         },
       ],
     })),
-  pushSessionEvent: (sessionEvent) => set({ sessionEvent }),
+  pushSessionEvent: (sessionEvent) => set({ connected: true, sessionEvent }),
   answerStart: (e) =>
     set((s) => {
       // If a prior answer was still active when a new one starts, move it to history so

@@ -19,6 +19,9 @@ declare global {
       quit: () => Promise<void>;
       showOverlay: () => Promise<void>;
       hideOverlay: () => Promise<void>;
+      minimizeOverlay: () => Promise<void>;
+      expandOverlay: () => Promise<void>;
+      toggleListening: () => Promise<void>;
       openSettings: () => Promise<void>;
       captureScreenshot: () => Promise<CaptureScreenshotResult>;
       updaterCheck?: () => Promise<void>;

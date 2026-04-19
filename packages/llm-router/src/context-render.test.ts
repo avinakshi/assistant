@@ -61,4 +61,26 @@ describe('buildUserMessage', () => {
     expect(out).toContain('<coding_problem>');
     expect(out).toContain('<title>Two Sum</title>');
   });
+
+  it('threads extraInstructions as a hard directive right before the question', () => {
+    const out = buildUserMessage(
+      { ...MIN, extraInstructions: 'Emphasize leadership examples. Answer in Hindi.' },
+      true,
+    );
+    expect(out).toContain('<candidate_extra_instructions>');
+    expect(out).toContain('Emphasize leadership examples. Answer in Hindi.');
+    expect(out).toContain('hard requirements');
+    // Must come before the <question> block so prompt-pack rules fire last.
+    const idxExtra = out.indexOf('<candidate_extra_instructions>');
+    const idxQ = out.indexOf('<question>');
+    expect(idxExtra).toBeGreaterThan(-1);
+    expect(idxQ).toBeGreaterThan(idxExtra);
+  });
+
+  it('omits extraInstructions wrapper when the field is empty / whitespace', () => {
+    const out1 = buildUserMessage({ ...MIN, extraInstructions: '' }, true);
+    const out2 = buildUserMessage({ ...MIN, extraInstructions: '   \n  ' }, true);
+    expect(out1).not.toContain('<candidate_extra_instructions>');
+    expect(out2).not.toContain('<candidate_extra_instructions>');
+  });
 });

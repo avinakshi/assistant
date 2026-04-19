@@ -40,7 +40,13 @@ export function setupTray(deps: TrayDeps): Tray {
   if (process.platform === 'darwin') image.setTemplateImage(true);
 
   tray = new Tray(image);
-  tray.setToolTip('Interview Copilot');
+  tray.setToolTip('Interview Copilot — click to show overlay, right-click for menu');
+  // Left-click (or single-click on macOS) = show the overlay. With skipTaskbar=true the
+  // window has no taskbar entry, so without this the only recovery path is right-clicking
+  // for the context menu — a user who didn't read the docs would permanently lose the
+  // overlay on hide. Single-click to restore is the expected Windows tray UX.
+  tray.on('click', () => deps.onShowOverlay());
+  tray.on('double-click', () => deps.onShowOverlay());
   activeDeps = deps;
   rebuildMenu();
   logger.info({}, 'tray ready');
@@ -82,12 +88,12 @@ function rebuildMenu(): void {
       { label: 'Sign Out', click: deps.onSignOut },
     );
   } else {
-    items.push({ label: 'Sign In\u2026', click: deps.onSignIn });
+    items.push({ label: 'Sign In…', click: deps.onSignIn });
   }
   items.push(
     { type: 'separator' },
-    { label: 'Open Settings\u2026', click: () => openSettingsWindow() },
-    { label: 'Check for Updates\u2026', click: deps.onCheckForUpdates },
+    { label: 'Open Settings…', click: () => openSettingsWindow() },
+    { label: 'Check for Updates…', click: deps.onCheckForUpdates },
     { type: 'separator' },
     { label: 'Quit Interview Copilot', click: deps.onQuit },
   );

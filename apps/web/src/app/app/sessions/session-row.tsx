@@ -26,7 +26,7 @@ export function SessionRowItem({ row, summary }: Props) {
 
   const overall = overallScore(summary?.scores);
   const status = row.ended_at ? 'ended' : 'in progress';
-  const dur = row.duration_s ? `${Math.max(1, Math.round(row.duration_s / 60))} min` : '\u2014';
+  const dur = row.duration_s ? `${Math.max(1, Math.round(row.duration_s / 60))} min` : '—';
   const href = row.kind === 'practice' ? `/app/practice/${row.id}` : `/app/sessions/${row.id}`;
 
   const del = () => {
@@ -52,11 +52,11 @@ export function SessionRowItem({ row, summary }: Props) {
         </span>
         <div className="min-w-0">
           <div className="truncate text-sm font-medium text-ink-900">
-            {modeLabel(row.mode)} \u00b7 {new Date(row.started_at).toLocaleString()}
+            {modeLabel(row.mode)} · {new Date(row.started_at).toLocaleString()}
           </div>
           <div className="mt-0.5 text-xs text-ink-500">
-            {status} \u00b7 {dur}
-            {overall !== null && ` \u00b7 overall ${overall.toFixed(1)}/5`}
+            {status} · {dur}
+            {overall !== null && ` · overall ${overall.toFixed(1)}/5`}
           </div>
         </div>
       </Link>

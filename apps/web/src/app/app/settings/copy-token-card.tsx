@@ -67,16 +67,16 @@ export function CopyTokenCard() {
     <div className="rounded-xl border border-ink-100 bg-white p-5">
       <div className="text-sm font-semibold text-ink-900">Chrome extension session</div>
       <p className="mt-1 text-xs text-ink-500">
-        Paste this JSON into the extension\u2019s Config \u2192 Session JSON field. The
-        extension keeps refreshing on its own after that \u2014 you won\u2019t need to come
+        Paste this JSON into the extension’s Config → Session JSON field. The
+        extension keeps refreshing on its own after that — you won’t need to come
         back here unless you sign out or switch devices.
       </p>
       {state === 'loading' && (
-        <div className="mt-3 text-xs text-ink-500">Loading session\u2026</div>
+        <div className="mt-3 text-xs text-ink-500">Loading session…</div>
       )}
       {state === 'no-session' && (
         <div className="mt-3 rounded border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
-          You\u2019re signed out in this tab. Refresh or sign in again.
+          You’re signed out in this tab. Refresh or sign in again.
         </div>
       )}
       {(state === 'ready' || state === 'copied' || state === 'error') && bundle && (
@@ -94,7 +94,7 @@ export function CopyTokenCard() {
               onClick={() => void copy()}
               className="rounded bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700"
             >
-              {state === 'copied' ? 'Copied \u2713' : 'Copy JSON'}
+              {state === 'copied' ? 'Copied ✓' : 'Copy JSON'}
             </button>
           </div>
           {state === 'error' && (

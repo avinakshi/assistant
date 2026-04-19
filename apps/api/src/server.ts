@@ -7,6 +7,8 @@ import { practiceSttRoutePlugin } from './ws/practice-stt-handler';
 import { prefsRoutePlugin } from './rest/prefs';
 import { extensionCodingAnswerPlugin } from './rest/extension-coding-answer';
 import { apiKeysRoutePlugin } from './rest/api-keys';
+import { sessionChatRoutePlugin } from './rest/session-chat';
+import { jdResumeGapRoutePlugin } from './rest/jd-resume-gap';
 
 export async function buildServer(): Promise<FastifyInstance> {
   const app = Fastify({
@@ -36,6 +38,11 @@ export async function buildServer(): Promise<FastifyInstance> {
   // Chrome extension's coding-answer endpoint. Needs Gemini configured to actually
   // answer; endpoint is registered either way so calls fail with a meaningful 503.
   await app.register(extensionCodingAnswerPlugin);
+  // "Ask AI about this session" post-interview chat. Registered unconditionally;
+  // returns 503 when Gemini or Supabase is unconfigured.
+  await app.register(sessionChatRoutePlugin);
+  // JD ↔ resume gap analysis (Phase 13e). Cached per (resume_id, jd_id) pair.
+  await app.register(jdResumeGapRoutePlugin);
 
   await app.register(echoRoutePlugin);
 

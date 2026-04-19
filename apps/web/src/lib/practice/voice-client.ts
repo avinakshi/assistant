@@ -105,6 +105,10 @@ export class VoiceClient {
       ws.onmessage = (ev) => {
         if (typeof ev.data !== 'string') return;
         try {
+          // Our own /ws/practice-stt WS stream. Each branch type-narrows the fields
+          // it actually reads; a full Zod parse here would slow the partial-transcript
+          // hot path without changing outcomes.
+          // eslint-disable-next-line no-restricted-syntax
           const parsed = JSON.parse(ev.data) as { type?: string } & Record<string, unknown>;
           if (parsed.type === 'ready') this.opts.onEvent({ kind: 'ready' });
           else if (parsed.type === 'partial')

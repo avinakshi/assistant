@@ -32,7 +32,7 @@ export default async function SessionsPage() {
         <div>
           <h1 className="text-2xl font-semibold">Sessions</h1>
           <p className="mt-1 text-sm text-ink-500">
-            Every live interview + practice session you\u2019ve run. Practice sessions open
+            Every live interview + practice session you’ve run. Practice sessions open
             into the chat transcript; live sessions show meta-data only (turn-by-turn
             persistence lands in Phase 9).
           </p>
@@ -64,7 +64,7 @@ export default async function SessionsPage() {
 }
 
 function StatsCard({ stats }: { stats: ReturnType<typeof computeStats> }) {
-  const avg = stats.avgOverall !== null ? stats.avgOverall.toFixed(1) : '\u2014';
+  const avg = stats.avgOverall !== null ? stats.avgOverall.toFixed(1) : '—';
   return (
     <section className="mt-6 grid gap-3 sm:grid-cols-4">
       <Stat label="Sessions, 7 days" value={`${stats.weeklyCount}`} />

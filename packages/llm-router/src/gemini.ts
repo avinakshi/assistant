@@ -78,9 +78,15 @@ function hintToPack(mode: AnswerMode): PromptPackName {
       return 'coding';
     case 'system_design':
       return 'system-design';
+    case 'technical':
+      return 'technical';
     case 'behavioral':
-    case 'auto':
       return 'behavioral';
+    case 'auto':
+      // Default when the question detector couldn't classify. 'technical' is the safer
+      // fallback than 'behavioral' — a technical-concept question getting a STAR story
+      // is a bigger failure than a behavioral question getting a direct answer.
+      return 'technical';
   }
 }
 

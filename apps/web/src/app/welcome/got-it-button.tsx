@@ -21,7 +21,7 @@ export function GotItButton() {
       }}
       className="rounded-md bg-brand-600 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-brand-500"
     >
-      {pending ? 'Saving\u2026' : 'Got it \u2014 take me to the dashboard'}
+      {pending ? 'Saving…' : 'Got it — take me to the dashboard'}
     </button>
   );
 }

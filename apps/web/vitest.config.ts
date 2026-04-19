@@ -7,6 +7,8 @@ export default defineConfig({
       // `server-only` is a no-op at runtime; Next's webpack maps it for client bundles but
       // outside Next there's no resolver for it. Point it at an empty shim for vitest.
       'server-only': fileURLToPath(new URL('./src/lib/test/server-only-shim.ts', import.meta.url)),
+      // Mirror the tsconfig `@/*` path so tests can import the same way app code does.
+      '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
   test: {

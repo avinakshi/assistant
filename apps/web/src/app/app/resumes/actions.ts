@@ -58,6 +58,7 @@ export async function uploadResumeAction(formData: FormData): Promise<UploadResu
       name,
       storage_path: storagePath,
       parsed_text: parsed.rawText,
+      ...(parsed.summary ? { structured_json: parsed.summary } : {}),
     })
     .select('id')
     .single();
@@ -122,4 +123,54 @@ export async function deleteResumeAction(resumeId: string): Promise<UploadResult
 
 function sanitizeFilename(name: string): string {
   return name.replace(/[^a-zA-Z0-9._-]+/g, '_').slice(0, 120);
+}
+
+/**
+ * Save the edited structured resume JSON. The caller supplies the full shape — we do a
+ * light shape-check here (must be an object, skills/experience/etc are arrays if present)
+ * so a broken editor can't corrupt the row. RLS enforces user_id ownership.
+ */
+export async function saveStructuredResumeAction(
+  resumeId: string,
+  structured: Record<string, unknown>,
+): Promise<UploadResult> {
+  if (!resumeId || typeof resumeId !== 'string') return { ok: false, error: 'missing resumeId' };
+  if (!structured || typeof structured !== 'object' || Array.isArray(structured)) {
+    return { ok: false, error: 'structured must be an object' };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: 'not signed in' };
+
+  // Strip unknown keys — keeps evolving the editor from writing junk the backend ignores.
+  const ALLOWED = new Set([
+    'name',
+    'headline',
+    'summary',
+    'yearsOfExperience',
+    'companies',
+    'titles',
+    'skills',
+    'education',
+    'experience',
+    'projects',
+    'certifications',
+  ]);
+  const clean: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(structured)) {
+    if (ALLOWED.has(k)) clean[k] = v;
+  }
+
+  const { error } = await supabase
+    .from('resumes')
+    .update({ structured_json: clean })
+    .eq('id', resumeId);
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath('/app/resumes');
+  revalidatePath(`/app/resumes/${resumeId}`);
+  return { ok: true, resumeId };
 }

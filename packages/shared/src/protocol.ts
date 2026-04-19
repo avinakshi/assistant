@@ -26,6 +26,26 @@ export const ClientMessageSchema = z.discriminatedUnion('type', [
      * written. Default false — matches the schema default (privacy-preserving).
      */
     persistTranscripts: z.boolean().optional(),
+    /**
+     * When true, each binary audio frame MUST be prefixed with a 1-byte source tag (0 =
+     * interviewer / remote audio, 1 = candidate / local mic). Total frame = 641 bytes
+     * instead of 640. The server routes each source to its own Deepgram stream and
+     * attaches `source` to transcript.partial / transcript.final events so the UI can
+     * label speakers.
+     */
+    diarize: z.boolean().optional(),
+    /**
+     * Phase 13d. Free-form bias supplied at session start: "emphasize leadership",
+     * "target Google L6", "answer in Hindi". Threaded into the LLM context so every
+     * answer honors it. Capped here at 2000 chars to keep the prompt bounded.
+     */
+    extraInstructions: z.string().max(2_000).optional(),
+    /**
+     * Phase 13f. When true, the LLM is instructed to reply in simple English: short
+     * sentences, common words (CEFR A2-B1), no idioms or business jargon. Designed
+     * for non-native English speakers who want answers they can deliver naturally.
+     */
+    simpleEnglish: z.boolean().optional(),
   }),
   z.object({ type: z.literal('session.stop') }),
   z.object({ type: z.literal('hint'), text: z.string().min(1).max(2000) }),
@@ -70,12 +90,16 @@ export const ServerMessageSchema = z.discriminatedUnion('type', [
     type: z.literal('transcript.partial'),
     text: z.string(),
     ts: z.number().int().nonnegative(),
+    /** Present only when the session was started with `diarize:true`. */
+    source: z.enum(['interviewer', 'candidate']).optional(),
   }),
   z.object({
     type: z.literal('transcript.final'),
     text: z.string(),
     ts: z.number().int().nonnegative(),
     isQuestion: z.boolean(),
+    /** Present only when the session was started with `diarize:true`. */
+    source: z.enum(['interviewer', 'candidate']).optional(),
   }),
   z.object({
     type: z.literal('answer.start'),

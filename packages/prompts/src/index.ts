@@ -1,7 +1,12 @@
 import bannedWords from './banned-words.json';
-import { BEHAVIORAL_PROMPT, CODING_PROMPT, SYSTEM_DESIGN_PROMPT } from './packs';
+import {
+  BEHAVIORAL_PROMPT,
+  CODING_PROMPT,
+  SYSTEM_DESIGN_PROMPT,
+  TECHNICAL_PROMPT,
+} from './packs';
 
-export { BEHAVIORAL_PROMPT, CODING_PROMPT, SYSTEM_DESIGN_PROMPT };
+export { BEHAVIORAL_PROMPT, CODING_PROMPT, SYSTEM_DESIGN_PROMPT, TECHNICAL_PROMPT };
 export {
   buildOpeningPrompt,
   buildTurnPrompt,
@@ -19,8 +24,24 @@ export {
   type LiveRecapEvent,
   type BuildLiveRecapInput,
 } from './live-recap';
+export {
+  buildSessionChatPrompt,
+  renderTranscript as renderSessionChatTranscript,
+  type SessionChatEvent,
+  type SessionChatMessage,
+  type SessionChatRole,
+  type BuildSessionChatInput,
+  type BuildSessionChatOutput,
+} from './session-chat';
+export {
+  buildJdResumeGapPrompt,
+  parseJdResumeGapResponse,
+  renderJdResumeGapForContext,
+  type BuildJdResumeGapInput,
+  type JdResumeGap,
+} from './jd-resume-gap';
 
-export type PromptPackName = 'behavioral' | 'coding' | 'system-design';
+export type PromptPackName = 'behavioral' | 'coding' | 'system-design' | 'technical';
 
 export function promptFor(name: PromptPackName): string {
   switch (name) {
@@ -30,6 +51,8 @@ export function promptFor(name: PromptPackName): string {
       return CODING_PROMPT;
     case 'system-design':
       return SYSTEM_DESIGN_PROMPT;
+    case 'technical':
+      return TECHNICAL_PROMPT;
   }
 }
 

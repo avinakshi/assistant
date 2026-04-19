@@ -117,8 +117,13 @@ function hintToPack(mode: AnswerMode): PromptPackName {
       return 'coding';
     case 'system_design':
       return 'system-design';
+    case 'technical':
+      return 'technical';
     case 'behavioral':
-    case 'auto':
       return 'behavioral';
+    case 'auto':
+      // Default: technical. A behavioral Q getting a direct answer is a smaller
+      // failure than a technical-concept Q getting a STAR story.
+      return 'technical';
   }
 }

@@ -60,6 +60,9 @@ async function generateJson(prompt: string): Promise<unknown> {
   const result = await model.generateContent(prompt);
   const raw = result.response.text();
   try {
+    // Gemini JSON-mode output. The caller wraps the returned value in a Zod parse,
+    // so this JSON.parse is just the decoder step, not the trust boundary.
+    // eslint-disable-next-line no-restricted-syntax
     return JSON.parse(raw) as unknown;
   } catch (err) {
     throw new Error(

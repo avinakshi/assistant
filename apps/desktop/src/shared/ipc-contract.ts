@@ -15,7 +15,11 @@ export const IpcInvokeChannels = {
   SystemQuit: 'system:quit',
   SystemShowOverlay: 'system:show-overlay',
   SystemHideOverlay: 'system:hide-overlay',
+  SystemMinimizeOverlay: 'system:minimize-overlay',
+  SystemExpandOverlay: 'system:expand-overlay',
   SystemOpenSettings: 'system:open-settings',
+  /** Start / stop the audio pipeline + WS session (same effect as Ctrl+Shift+S). */
+  SystemToggleListening: 'system:toggle-listening',
   /** Capture the screen, encode PNG, push as `screenshot` ClientMessage over the WS. */
   SystemCaptureScreenshot: 'system:capture-screenshot',
   /** Kick off a manual update check (tray menu / settings). */
@@ -82,6 +86,7 @@ export interface SessionEventPayload {
     | 'stt-error'
     | 'auth-failed'
     | 'disconnected'
+    | 'error' // non-terminal server error surfaced to the overlay (e.g. OCR: no problem)
     | 'listening' // user pressed Ctrl+Shift+S and STT is actively open
     | 'idle'; // stopped or never started — no Deepgram / no LLM calls
   readonly message?: string;

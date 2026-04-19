@@ -104,7 +104,7 @@ function renderHandoffHtml(destUrl: string, mode: 'desktop' | 'extension'): stri
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Interview Copilot \u2014 handing off\u2026</title>
+    <title>Interview Copilot — handing off…</title>
     <meta http-equiv="refresh" content="1;url=${escaped}" />
     <style>
       body { font: 14px/1.5 system-ui, -apple-system, sans-serif; color: #111; max-width: 420px; margin: 8rem auto; padding: 0 1rem; }
@@ -114,8 +114,8 @@ function renderHandoffHtml(destUrl: string, mode: 'desktop' | 'extension'): stri
     </style>
   </head>
   <body>
-    <h1>Signing you in to Interview Copilot\u2026</h1>
-    <p>We\u2019re handing off to ${target}. If the window doesn\u2019t switch automatically, click the button below.</p>
+    <h1>Signing you in to Interview Copilot…</h1>
+    <p>We’re handing off to ${target}. If the window doesn’t switch automatically, click the button below.</p>
     <a class="btn" href="${escaped}">Return to Interview Copilot</a>
     <p style="margin-top:2rem; color:#888;">You can close this tab once the app is focused.</p>
     <script>

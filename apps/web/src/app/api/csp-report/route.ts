@@ -17,7 +17,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const body = await request.text();
     // Log to stdout so deploys capture it. Cap the body size to 4 KB; real CSP reports
     // are always small, and a runaway one shouldn't flood the log.
-    const truncated = body.length > 4_000 ? body.slice(0, 4_000) + '\u2026' : body;
+    const truncated = body.length > 4_000 ? body.slice(0, 4_000) + '…' : body;
     // eslint-disable-next-line no-console
     console.warn('[csp-report]', truncated);
   } catch {

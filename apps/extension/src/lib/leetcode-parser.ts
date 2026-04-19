@@ -67,7 +67,7 @@ function findTitle(doc: Document): string {
 
 function stripTitleNoise(raw: string): string {
   // "1. Two Sum - LeetCode" → "1. Two Sum"
-  let s = raw.replace(/\s*[-|\u2014]\s*LeetCode\s*$/i, '');
+  let s = raw.replace(/\s*[-|—]\s*LeetCode\s*$/i, '');
   // Strip duplicate leading numbering if the page title already has " - LeetCode" etc.
   s = s.replace(/\s+/g, ' ').trim();
   return s;
@@ -160,7 +160,7 @@ export function splitBody(body: string): SplitResult {
       }
     } else if (section === 'constraints') {
       // Strip common bullet markers. Don't eat negative-leading numbers like "-10^9".
-      const stripped = line.replace(/^[\u2022\*]\s*/, '').trim();
+      const stripped = line.replace(/^[•\*]\s*/, '').trim();
       if (stripped.length > 0) constraints.push(stripped);
     }
     // followup lines are intentionally ignored for now.

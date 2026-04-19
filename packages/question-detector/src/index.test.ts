@@ -105,4 +105,20 @@ describe('question detector — hint classification precedence', () => {
     expect(r.isQuestion).toBe(true);
     expect(r.hint).toBe('system_design');
   });
+
+  // Phase-13 coding-trigger loosening: stems with language modifiers must still fire.
+  it.each([
+    'Write a JavaScript function to find the largest number in an array',
+    'Write an efficient Python function to reverse a linked list',
+    'Create a recursive method to compute Fibonacci',
+    'Given a sorted array, find the kth smallest element',
+    'Check if a string is a palindrome',
+    'Count the number of vowels in a string',
+    'Return the longest common subsequence',
+    'Reverse a linked list in place',
+  ])('classifies "%s" as a coding question', (text) => {
+    const r = classify({ text, nowMs: NOW });
+    expect(r.isQuestion).toBe(true);
+    expect(r.hint).toBe('coding');
+  });
 });

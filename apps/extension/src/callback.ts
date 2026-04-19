@@ -82,7 +82,7 @@ async function main(): Promise<void> {
   await clearPending();
 
   succeed(
-    'Signed in \u2713\nYou can close this tab. Click the Interview Copilot extension icon to continue.',
+    'Signed in ✓\nYou can close this tab. Click the Interview Copilot extension icon to continue.',
   );
 
   // Auto-close after a short delay so the user sees the confirmation.

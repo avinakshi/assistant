@@ -27,7 +27,7 @@ export default async function WelcomePage() {
       </h1>
       <p className="mt-3 text-base text-ink-700">
         You&apos;re signed in as <span className="font-medium">{user.email}</span>. Here
-        are the four surfaces you\u2019ll use \u2014 start with whichever one fits today.
+        are the four surfaces you’ll use — start with whichever one fits today.
       </p>
 
       <ol className="mt-8 flex flex-col gap-4">
@@ -41,7 +41,7 @@ export default async function WelcomePage() {
         <Step
           index={2}
           title="Install the desktop app"
-          body="The live interview overlay runs on your machine \u2014 WASAPI loopback captures the interviewer's audio, invisible to screen capture. Download below; it signs in to this account automatically."
+          body="The live interview overlay runs on your machine — WASAPI loopback captures the interviewer's audio, invisible to screen capture. Download below; it signs in to this account automatically."
           href="https://github.com/avinakshi/assistant/releases"
           cta="Get the desktop app"
           external
@@ -93,14 +93,14 @@ function Step({
       rel="noreferrer noopener"
       className="mt-3 inline-block text-sm font-medium text-brand-600 hover:underline focus-visible:outline-2 focus-visible:outline-brand-500"
     >
-      {cta} \u2192
+      {cta} →
     </a>
   ) : (
     <Link
       href={href}
       className="mt-3 inline-block text-sm font-medium text-brand-600 hover:underline focus-visible:outline-2 focus-visible:outline-brand-500"
     >
-      {cta} \u2192
+      {cta} →
     </Link>
   );
   return (

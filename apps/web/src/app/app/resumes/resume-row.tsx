@@ -1,6 +1,7 @@
 'use client';
 
 import { useTransition } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { deleteResumeAction, setDefaultResumeAction } from './actions';
 import { cn } from '@/lib/cn';
@@ -56,6 +57,12 @@ export function ResumeRow({ id, name, isDefault, createdAt, excerpt }: Props) {
           )}
         </div>
         <div className="flex shrink-0 gap-2">
+          <Link
+            href={`/app/resumes/${id}`}
+            className="rounded border border-ink-100 px-3 py-1.5 text-xs text-ink-700 hover:bg-ink-50"
+          >
+            Edit
+          </Link>
           {!isDefault && (
             <button
               type="button"

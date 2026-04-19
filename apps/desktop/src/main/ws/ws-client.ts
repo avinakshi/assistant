@@ -47,6 +47,14 @@ export interface SessionStartParams {
   language?: string;
   /** Phase 9: persist per-turn transcripts + answers for post-session review. */
   persistTranscripts?: boolean;
+  /**
+   * Free-form bias threaded into every LLM answer. Useful when the desktop is running
+   * in shared-secret mode (no Supabase sign-in, no resume/JD in the DB) — the user
+   * can still tailor answers to a role by setting SESSION_EXTRA_INSTRUCTIONS in env.
+   */
+  extraInstructions?: string;
+  /** Phase 13f. CEFR A2-B1 English style for non-native speakers. */
+  simpleEnglish?: boolean;
 }
 
 const DEFAULT_BACKOFF = [1_000, 2_000, 4_000, 8_000, 16_000, 30_000];
@@ -221,6 +229,10 @@ export class WsClient {
       ...(params.persistTranscripts !== undefined
         ? { persistTranscripts: params.persistTranscripts }
         : {}),
+      ...(params.extraInstructions && params.extraInstructions.trim().length > 0
+        ? { extraInstructions: params.extraInstructions.trim() }
+        : {}),
+      ...(params.simpleEnglish ? { simpleEnglish: true } : {}),
     });
   }
 

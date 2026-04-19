@@ -21,7 +21,14 @@ export function TranscriptPane() {
       className="flex flex-col gap-1 border-t border-overlay-border px-4 py-3"
       data-testid="transcript-pane"
     >
-      <div className="text-[10px] uppercase tracking-wider text-overlay-dim">transcript</div>
+      <div className="flex items-center gap-2">
+        <span className="rounded bg-sky-500/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-sky-300">
+          Question
+        </span>
+        <span className="text-[10px] uppercase tracking-wider text-overlay-dim">
+          what the interviewer said
+        </span>
+      </div>
       <div className="flex flex-col gap-0.5 text-[12px] leading-snug">
         {visible.length === 0 && !partial ? (
           <div className="italic text-overlay-dim">listening…</div>
@@ -33,7 +40,7 @@ export function TranscriptPane() {
                 className={cn(
                   'whitespace-pre-wrap',
                   i < visible.length - 1 ? 'text-overlay-dim' : 'text-overlay-text',
-                  f.isQuestion && 'text-overlay-accent',
+                  f.isQuestion && 'font-medium text-sky-300',
                 )}
                 data-testid="transcript-final"
                 data-is-question={f.isQuestion}

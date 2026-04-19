@@ -90,7 +90,7 @@ export function NewPracticeForm() {
         disabled={pending}
         className="self-start rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {pending ? 'Warming up\u2026' : 'Start practice'}
+        {pending ? 'Warming up…' : 'Start practice'}
       </button>
     </div>
   );

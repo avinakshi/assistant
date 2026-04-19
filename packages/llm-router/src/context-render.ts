@@ -46,6 +46,15 @@ export function renderCodingProblem(p: CodingProblemLike): string {
     for (const c of p.constraints) lines.push(`    <c>${c}</c>`);
     lines.push('  </constraints>');
   }
+  // Always include rawText so platforms we don't have a structured parser for (CodeSignal,
+  // Codility, CoderByte, company-internal portals, Google Docs, screenshots of PDFs)
+  // still reach the LLM. The prompt pack treats rawText as the ground truth when no
+  // structured fields are present.
+  if (p.rawText && p.rawText.trim().length > 0) {
+    lines.push('  <raw_ocr_text>');
+    lines.push(indent(p.rawText.trim(), 4));
+    lines.push('  </raw_ocr_text>');
+  }
   lines.push('</coding_problem>');
   return lines.join('\n');
 }
@@ -95,6 +104,13 @@ export function buildUserMessage(ctx: AnswerContext, includeStaticBlocks: boolea
     parts.push(renderCodingProblem(ctx.codingProblem));
   }
   parts.push(`<language>${language}</language>`);
+  if (ctx.extraInstructions && ctx.extraInstructions.trim().length > 0) {
+    // Placed RIGHT before the question so it's the last thing the model sees before
+    // the prompt-pack rules fire. Wrapped as a hard directive — not a suggestion.
+    parts.push(
+      `<candidate_extra_instructions>\nThe candidate supplied these constraints. Honor them in your answer as hard requirements:\n${ctx.extraInstructions.trim()}\n</candidate_extra_instructions>`,
+    );
+  }
   parts.push(`<question>\n${ctx.question.trim()}\n</question>`);
   if (ctx.retryHint) {
     parts.push(`<retry_instruction>\n${ctx.retryHint.trim()}\n</retry_instruction>`);

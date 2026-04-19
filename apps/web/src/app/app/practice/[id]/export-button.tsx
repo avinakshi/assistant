@@ -48,7 +48,7 @@ export function ExportButton({ input }: { input: ExportInput }) {
             onClick={() => void onCopy()}
             className="rounded bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700"
           >
-            {state === 'copied' ? 'Copied \u2713' : 'Copy markdown'}
+            {state === 'copied' ? 'Copied ✓' : 'Copy markdown'}
           </button>
         </div>
       </div>

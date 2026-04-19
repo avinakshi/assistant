@@ -44,6 +44,22 @@ function resolveWsRoute(): WsRoute {
 const AUDIO_SOURCE: AudioSourceKind = resolveAudioSource();
 const WS_ROUTE: WsRoute = resolveWsRoute();
 const SESSION_LANGUAGE = process.env.SESSION_LANGUAGE ?? 'en';
+/**
+ * Free-form interview context string — role title, company, focus areas, anything the
+ * candidate wants the LLM to tailor every answer around. Threaded through session.start
+ * as `extraInstructions`. Works in both shared-secret and signed-in modes; no DB hit.
+ *
+ * Composed from SESSION_ROLE_HINT + SESSION_EXTRA_INSTRUCTIONS so users can specify
+ * the role separately from the free-form bits:
+ *   SESSION_ROLE_HINT="Corporate Trainer at Acme, interviewing for Senior Trainer"
+ *   SESSION_EXTRA_INSTRUCTIONS="Emphasize adult learning theory and stakeholder empathy."
+ */
+const SESSION_EXTRA_INSTRUCTIONS: string =
+  [process.env.SESSION_ROLE_HINT, process.env.SESSION_EXTRA_INSTRUCTIONS]
+    .map((s) => (s ?? '').trim())
+    .filter((s) => s.length > 0)
+    .join('\n\n');
+const SESSION_SIMPLE_ENGLISH = process.env.SESSION_SIMPLE_ENGLISH === 'true';
 
 interface PipelineRefs {
   pipeline: AudioPipeline;
@@ -128,6 +144,20 @@ async function bootstrapPipeline(
           answerId: msg.answerId,
           reason: msg.reason,
         } satisfies AnswerCanceledPayload);
+      } else if (msg.type === 'error') {
+        // Non-terminal server errors (e.g. OCR "no coding problem detected" after
+        // Analyze on a non-LeetCode page) get forwarded to the overlay as a session
+        // event so the user sees WHY nothing happened instead of a silent no-op.
+        const kind: SessionEventPayload['kind'] =
+          msg.code === 'AUTH'
+            ? 'auth-failed'
+            : msg.code === 'QUOTA_EXCEEDED'
+              ? 'quota-exceeded'
+              : 'error';
+        broadcast(IpcPushChannels.SessionEvent, {
+          kind,
+          message: msg.message,
+        } satisfies SessionEventPayload);
       }
     },
   });
@@ -211,9 +241,15 @@ async function bootstrapWithWindows(): Promise<void> {
   // read this lazily so they don't crash if they fire before the pipeline is ready.
   let activeWs: import('./ws/ws-client').WsClient | null = null;
 
+  // toggleListening is defined further down (it closes over the pipeline state that
+  // doesn't exist yet). Hold its function pointer in a ref so the IPC handler can call
+  // it lazily once the pipeline has bootstrapped.
+  const toggleListeningRef: { fn: () => void } = { fn: () => { /* pre-pipeline noop */ } };
+
   registerIpcHandlers({
     getOverlay: () => (overlay.isDestroyed() ? null : overlay),
     getWs: () => activeWs,
+    onToggleListening: () => toggleListeningRef.fn(),
     onCheckForUpdates: () => checkForUpdatesNow(),
     onInstallUpdate: () => installAndRelaunch(),
   });
@@ -264,6 +300,10 @@ async function bootstrapWithWindows(): Promise<void> {
           mode: 'auto',
           llm: 'auto',
           persistTranscripts: prefs.persistTranscriptsDefault,
+          ...(SESSION_EXTRA_INSTRUCTIONS.length > 0
+            ? { extraInstructions: SESSION_EXTRA_INSTRUCTIONS }
+            : {}),
+          ...(SESSION_SIMPLE_ENGLISH ? { simpleEnglish: true } : {}),
         });
         logger.info(
           { persistTranscripts: prefs.persistTranscriptsDefault },
@@ -285,6 +325,8 @@ async function bootstrapWithWindows(): Promise<void> {
   };
 
   const toggleListening = (): void => setListening(!isListening);
+  // Wire the pre-registered IPC handler to the real implementation now that it exists.
+  toggleListeningRef.fn = toggleListening;
 
   const handleDeepLink = async (rawUrl: string): Promise<void> => {
     if (!rawUrl.startsWith('ic://')) return;

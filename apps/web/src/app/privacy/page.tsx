@@ -10,14 +10,14 @@ export default function PrivacyPage() {
   return (
     <div className="mx-auto max-w-3xl px-6 py-12">
       <Link href="/" className="text-sm text-ink-500 hover:text-ink-900">
-        \u2190 Home
+        ← Home
       </Link>
       <h1 className="mt-4 text-3xl font-semibold">Privacy policy</h1>
       <p className="mt-1 text-sm text-ink-500">Last updated {updated}</p>
 
       <Section title="Summary">
         <p>
-          Interview Copilot captures the interviewer\u2019s voice during a live session
+          Interview Copilot captures the interviewer’s voice during a live session
           so it can generate AI answers for you in real time. We keep the minimum data
           needed to deliver that product. We never sell data. Most transcript data is
           opt-in and deletable. Audio is streamed through a speech-to-text provider and
@@ -37,7 +37,7 @@ export default function PrivacyPage() {
             needed for the weekly usage meter.
           </li>
           <li>
-            <strong>Session transcripts + AI answers</strong> \u2014 only when
+            <strong>Session transcripts + AI answers</strong> — only when
             <em> Save live session transcripts</em> is on under Settings. You can delete
             any session at any time from <code>/app/sessions</code>.
           </li>
@@ -47,7 +47,7 @@ export default function PrivacyPage() {
           </li>
           <li>
             <strong>Operational logs.</strong> Per-request logs with timestamps, chars
-            processed, and latencies. We deliberately don\u2019t log transcript or answer
+            processed, and latencies. We deliberately don’t log transcript or answer
             text in these logs.
           </li>
         </ul>
@@ -56,17 +56,17 @@ export default function PrivacyPage() {
       <Section title="What leaves our servers">
         <ul className="mt-2 list-disc space-y-1 pl-5 text-ink-700">
           <li>
-            <strong>Audio</strong> \u2192 Deepgram (Nova-3) for transcription. Streamed,
-            not stored by us. Deepgram\u2019s retention is governed by their policy.
+            <strong>Audio</strong> → Deepgram (Nova-3) for transcription. Streamed,
+            not stored by us. Deepgram’s retention is governed by their policy.
           </li>
           <li>
-            <strong>Transcripts + your resume/JD context</strong> \u2192 Gemini
-            (Google AI) or Anthropic\u2019s Claude, depending on your tier, to generate
-            answers. We don\u2019t keep a copy beyond the session DB unless you enabled
+            <strong>Transcripts + your resume/JD context</strong> → Gemini
+            (Google AI) or Anthropic’s Claude, depending on your tier, to generate
+            answers. We don’t keep a copy beyond the session DB unless you enabled
             persistence.
           </li>
           <li>
-            <strong>Screenshots</strong> \u2192 Google Cloud Vision for OCR on the coding
+            <strong>Screenshots</strong> → Google Cloud Vision for OCR on the coding
             workflow. The raw PNG is not stored by us.
           </li>
         </ul>
@@ -79,41 +79,41 @@ export default function PrivacyPage() {
       <Section title="Your controls">
         <ul className="mt-2 list-disc space-y-1 pl-5 text-ink-700">
           <li>Toggle transcript persistence in Settings.</li>
-          <li>Delete any session from <code>/app/sessions</code> \u2014 cascades to
+          <li>Delete any session from <code>/app/sessions</code> — cascades to
             every related event + summary.</li>
           <li>Revoke API keys from <code>/app/settings</code>.</li>
           <li>
             Request export or full deletion by emailing the address in our support
-            channel. We\u2019ll respond within 30 days as required by GDPR / DPDP.
+            channel. We’ll respond within 30 days as required by GDPR / DPDP.
           </li>
         </ul>
       </Section>
 
       <Section title="Cookies + analytics">
         <p>
-          Supabase auth cookies are used to keep you signed in. We don\u2019t run any
+          Supabase auth cookies are used to keep you signed in. We don’t run any
           analytics or tracking scripts. No third-party ads, no cross-site tracking.
         </p>
       </Section>
 
       <Section title="Jurisdiction">
         <p>
-          Data is stored in Supabase\u2019s ap-south-1 region (Mumbai, India). If you
-          prefer a different region, email us before signing up \u2014 we can route you
+          Data is stored in Supabase’s ap-south-1 region (Mumbai, India). If you
+          prefer a different region, email us before signing up — we can route you
           to a separate project.
         </p>
       </Section>
 
       <Section title="Changes">
         <p>
-          We\u2019ll update this page when things change materially. Meaningful changes
+          We’ll update this page when things change materially. Meaningful changes
           go out via email to your account.
         </p>
       </Section>
 
       <div className="mt-12 flex gap-4 text-sm">
         <Link href="/terms" className="text-brand-600 hover:underline">
-          Terms of service \u2192
+          Terms of service →
         </Link>
       </div>
     </div>

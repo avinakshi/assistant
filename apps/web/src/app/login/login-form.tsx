@@ -69,7 +69,7 @@ export function LoginForm() {
         <div className="font-medium">Check your inbox</div>
         <div className="mt-1">
           We sent a login link to {email}.
-          {isDesktop && ' Click it and you\u2019ll be returned to the Interview Copilot app.'}
+          {isDesktop && ' Click it and you’ll be returned to the Interview Copilot app.'}
           {isExtension && ' Click it and the Chrome extension will pick up the session automatically.'}
         </div>
       </div>

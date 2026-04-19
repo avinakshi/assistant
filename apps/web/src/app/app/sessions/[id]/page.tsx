@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { LiveSessionTimeline, type TimelineEvent } from './timeline';
 import { CopyLiveButton } from './copy-live-button';
+import { SessionChatPanel } from './chat-panel';
 import { modeLabel } from '@/lib/sessions/aggregate';
 
 export const dynamic = 'force-dynamic';
@@ -61,7 +62,7 @@ export default async function SessionDetailPage({
         <p className="text-sm text-ink-500">
           This is a practice session.{' '}
           <Link href={`/app/practice/${s.id}`} className="text-brand-600 hover:underline">
-            Open practice viewer \u2192
+            Open practice viewer →
           </Link>
         </p>
       </div>
@@ -97,14 +98,14 @@ export default async function SessionDetailPage({
           <div className="text-xs text-ink-500">Live session</div>
           <h1 className="mt-0.5 text-xl font-semibold">{modeLabel(s.mode)}</h1>
           <div className="mt-1 text-xs text-ink-500">
-            {new Date(s.started_at).toLocaleString()} \u00b7 {durationLine} \u00b7 {s.llm_choice}
+            {new Date(s.started_at).toLocaleString()} · {durationLine} · {s.llm_choice}
           </div>
         </div>
         <Link
           href="/app/sessions"
           className="text-xs text-ink-500 hover:text-ink-900 hover:underline"
         >
-          \u2190 All sessions
+          ← All sessions
         </Link>
       </div>
 
@@ -157,7 +158,7 @@ export default async function SessionDetailPage({
           <div className="font-medium text-ink-900">No transcript saved for this session.</div>
           <p className="mt-2 text-ink-500">
             Transcript persistence was off when the session ran. The session row is here for
-            the usage meter; there\u2019s nothing more to review.
+            the usage meter; there’s nothing more to review.
           </p>
         </div>
       ) : timelineEvents.length === 0 ? (
@@ -179,6 +180,7 @@ export default async function SessionDetailPage({
               ...(improvements.length > 0 ? { improvements } : {}),
             }}
           />
+          <SessionChatPanel sessionId={s.id} />
         </>
       )}
     </div>

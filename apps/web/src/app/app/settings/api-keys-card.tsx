@@ -89,7 +89,7 @@ export function ApiKeysCard() {
   };
 
   const revoke = (id: string, name: string) => {
-    if (!window.confirm(`Revoke key "${name}"? This can\u2019t be undone.`)) return;
+    if (!window.confirm(`Revoke key "${name}"? This can’t be undone.`)) return;
     startTransition(() => {
       void (async () => {
         const supabase = createClient();
@@ -120,7 +120,7 @@ export function ApiKeysCard() {
     <div className="rounded-xl border border-ink-100 bg-white p-5">
       <div className="text-sm font-semibold text-ink-900">API keys</div>
       <p className="mt-1 text-xs text-ink-500">
-        Long-lived tokens scoped to you. Alternative to the 1-hour Supabase session \u2014
+        Long-lived tokens scoped to you. Alternative to the 1-hour Supabase session —
         paste the plaintext into the Chrome extension or use it for headless scripts. Each
         key is shown once when created.
       </p>
@@ -137,11 +137,11 @@ export function ApiKeysCard() {
               onClick={() => void copyPlaintext()}
               className="rounded bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700"
             >
-              {copied ? 'Copied \u2713' : 'Copy'}
+              {copied ? 'Copied ✓' : 'Copy'}
             </button>
           </div>
           <div className="mt-2 text-[11px] text-emerald-800">
-            Copy now \u2014 this is the only time you\u2019ll see the full key.
+            Copy now — this is the only time you’ll see the full key.
           </div>
         </div>
       )}
@@ -169,11 +169,11 @@ export function ApiKeysCard() {
       </div>
 
       {phase.kind === 'loading' && (
-        <div className="mt-3 text-xs text-ink-500">Loading keys\u2026</div>
+        <div className="mt-3 text-xs text-ink-500">Loading keys…</div>
       )}
       {phase.kind === 'no-session' && (
         <div className="mt-3 rounded border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
-          You\u2019re signed out in this tab.
+          You’re signed out in this tab.
         </div>
       )}
       {phase.kind === 'error' && (
@@ -198,11 +198,11 @@ export function ApiKeysCard() {
                     )}
                   </div>
                   <div className="mt-0.5 font-mono text-[11px] text-ink-500">
-                    {k.prefix}\u2026
+                    {k.prefix}…
                   </div>
                   <div className="mt-0.5 text-[11px] text-ink-500">
                     Created {new Date(k.created_at).toLocaleDateString()}
-                    {k.last_used_at && ` \u00b7 last used ${new Date(k.last_used_at).toLocaleDateString()}`}
+                    {k.last_used_at && ` · last used ${new Date(k.last_used_at).toLocaleDateString()}`}
                   </div>
                 </div>
                 {!k.revoked_at && (

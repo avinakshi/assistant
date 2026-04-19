@@ -102,12 +102,12 @@ export function extractTitle(html: string): { title?: string; company?: string; 
   const ogT = ogTitle?.[1]?.trim();
 
   // "<Role> at <Company> | Board" pattern — very common on LinkedIn, Lever, Ashby.
-  const atPattern = /^(.*?)\s+(?:at|@|\u2014|\u2013|-)\s+(.*?)(?:\s*[\|·].*)?$/;
+  const atPattern = /^(.*?)\s+(?:at|@|—|–|-)\s+(.*?)(?:\s*[|·].*)?$/;
   const source = rawTitle ?? ogT ?? '';
   const m = atPattern.exec(source);
   if (m && m[1] && m[2]) {
     const role = m[1].trim();
-    const company = m[2].split(/\s*[\|·]\s*/)[0]?.trim();
+    const company = m[2].split(/\s*[|·]\s*/)[0]?.trim();
     return {
       ...(source ? { title: source } : {}),
       ...(role ? { role } : {}),

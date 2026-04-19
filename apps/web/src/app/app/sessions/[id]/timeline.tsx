@@ -71,7 +71,7 @@ export function LiveSessionTimeline({ events }: Props) {
     <div>
       <div className="mb-3 flex items-center justify-between">
         <span className="text-xs text-ink-500">
-          {events.length} events \u00b7 {items.filter((i) => i.pairedAnswer).length} Q/A pairs
+          {events.length} events · {items.filter((i) => i.pairedAnswer).length} Q/A pairs
         </span>
         <label className="flex cursor-pointer items-center gap-1.5 text-xs text-ink-500">
           <input
@@ -118,6 +118,22 @@ function TranscriptCard({
 }) {
   const text = asString(ev.payload['text']);
   const isQuestion = ev.payload['isQuestion'] === true;
+  // Diarize-mode payloads (Phase 13b) include `source`. Rows from older sessions don't,
+  // so default to "interviewer" — matches the pre-diarize UX.
+  const source =
+    ev.payload['source'] === 'candidate' ? 'candidate' : 'interviewer';
+  // Prefer the diarize label over the old isQuestion-based one when available: even a
+  // non-question utterance from the candidate deserves the "You" tag, not "Interviewer".
+  const hasSource = ev.payload['source'] === 'interviewer' || ev.payload['source'] === 'candidate';
+  const label = hasSource
+    ? source === 'candidate'
+      ? 'You'
+      : isQuestion
+        ? 'Question'
+        : 'Interviewer'
+    : isQuestion
+      ? 'Question'
+      : 'Interviewer';
   return (
     <div className="flex flex-col gap-3">
       <div
@@ -128,10 +144,14 @@ function TranscriptCard({
         <div className="flex items-center gap-2">
           <span
             className={`text-xs font-semibold uppercase tracking-wider ${
-              isQuestion ? 'text-brand-700' : 'text-ink-500'
+              source === 'candidate'
+                ? 'text-emerald-700'
+                : isQuestion
+                  ? 'text-brand-700'
+                  : 'text-ink-500'
             }`}
           >
-            {isQuestion ? 'Question' : 'Interviewer'}
+            {label}
           </span>
           <TimeBadge ts={ev.ts} />
         </div>
@@ -185,13 +205,13 @@ function OcrCard({ ev }: { ev: TimelineEvent }) {
   return (
     <div className="rounded-xl border border-amber-100 bg-amber-50 p-3">
       <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-amber-800">
-        Screenshot \u2192 OCR
+        Screenshot → OCR
         <TimeBadge ts={ev.ts} />
       </div>
       <div className="mt-1 text-sm text-ink-900">
         {title || '(untitled problem)'}{' '}
         <span className="text-xs text-ink-500">
-          {site} {difficulty && `\u00b7 ${difficulty}`}
+          {site} {difficulty && `· ${difficulty}`}
         </span>
       </div>
     </div>

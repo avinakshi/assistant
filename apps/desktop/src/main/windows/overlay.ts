@@ -25,7 +25,10 @@ export function overlayWindowOptions(): Electron.BrowserWindowConstructorOptions
     transparent: true,
     resizable: true,
     movable: true,
-    minimizable: false,
+    // Minimize is on so the overlay header's Min button does something. Maximize stays
+    // off — the overlay is a fixed-size widget; maximizing it would make the stealth
+    // surface huge and the candidate's meeting tab lose focus.
+    minimizable: true,
     maximizable: false,
     alwaysOnTop: true,
     skipTaskbar: true,

@@ -1,11 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import {
   AUDIO_BYTES_PER_FRAME,
+  AUDIO_BYTES_PER_FRAME_DIARIZED,
   AUDIO_FRAMES_PER_SECOND,
   AUDIO_FRAME_DURATION_MS,
   AUDIO_SAMPLES_PER_FRAME,
   AUDIO_SAMPLE_RATE_HZ,
+  AUDIO_SOURCE_CANDIDATE,
+  AUDIO_SOURCE_INTERVIEWER,
+  AUDIO_SOURCE_TAG_BYTES,
   computeRmsDb,
+  decodeAudioSourceTag,
+  encodeAudioSourceTag,
   isValidPcmFrame,
 } from './audio';
 
@@ -55,5 +61,26 @@ describe('computeRmsDb', () => {
 
   it('returns -Infinity for empty input', () => {
     expect(computeRmsDb(new Int16Array(0))).toBe(-Infinity);
+  });
+});
+
+describe('diarize frame layout', () => {
+  it('uses a single extra byte as the source tag', () => {
+    expect(AUDIO_SOURCE_TAG_BYTES).toBe(1);
+    expect(AUDIO_BYTES_PER_FRAME_DIARIZED).toBe(AUDIO_BYTES_PER_FRAME + 1);
+    expect(AUDIO_SOURCE_INTERVIEWER).toBe(0);
+    expect(AUDIO_SOURCE_CANDIDATE).toBe(1);
+  });
+
+  it('round-trips encode/decode for both sources', () => {
+    expect(encodeAudioSourceTag('interviewer')).toBe(AUDIO_SOURCE_INTERVIEWER);
+    expect(encodeAudioSourceTag('candidate')).toBe(AUDIO_SOURCE_CANDIDATE);
+    expect(decodeAudioSourceTag(AUDIO_SOURCE_INTERVIEWER)).toBe('interviewer');
+    expect(decodeAudioSourceTag(AUDIO_SOURCE_CANDIDATE)).toBe('candidate');
+  });
+
+  it('defaults unknown tag bytes to interviewer (conservative — unlabeled audio is treated as remote)', () => {
+    expect(decodeAudioSourceTag(99)).toBe('interviewer');
+    expect(decodeAudioSourceTag(-1)).toBe('interviewer');
   });
 });

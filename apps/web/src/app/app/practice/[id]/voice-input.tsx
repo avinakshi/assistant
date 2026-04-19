@@ -134,7 +134,7 @@ export function VoiceInput({ onSubmit, enabled }: Props) {
             </button>
           )}
           {phase === 'connecting' && (
-            <span className="text-xs text-ink-500">Connecting\u2026</span>
+            <span className="text-xs text-ink-500">Connecting…</span>
           )}
           {phase === 'listening' && (
             <>
@@ -168,7 +168,7 @@ export function VoiceInput({ onSubmit, enabled }: Props) {
       {phase === 'listening' && (
         <div className="mt-2 flex items-center gap-2 text-xs text-ink-700">
           <span className="flex h-2 w-2 animate-pulse rounded-full bg-red-500" />
-          Listening\u2026 speak clearly.
+          Listening… speak clearly.
         </div>
       )}
       {combined.length > 0 && (

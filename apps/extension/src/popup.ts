@@ -142,7 +142,7 @@ async function loadProblemFromActiveTab(): Promise<void> {
         kind: 'no-problem',
         reason:
           response?.error ??
-          `Couldn\u2019t read the problem. Try reloading the ${match.label} tab.`,
+          `Couldn’t read the problem. Try reloading the ${match.label} tab.`,
       };
       render();
       return;
@@ -316,13 +316,13 @@ function render(): void {
     els.problemDifficulty.className = 'pill ' + (p.difficulty?.toLowerCase() ?? '');
     els.problemSlug.textContent = p.slug ? `/${p.slug}` : '';
     els.getSolution.disabled = state.kind === 'fetching-answer' || !hasToken;
-    els.getSolution.textContent = state.kind === 'fetching-answer' ? 'Thinking\u2026' : 'Get solution';
+    els.getSolution.textContent = state.kind === 'fetching-answer' ? 'Thinking…' : 'Get solution';
   } else {
     els.problemSection.hidden = true;
     els.getSolution.disabled = true;
     els.getSolution.textContent =
       state.kind === 'loading-problem'
-        ? 'Loading\u2026'
+        ? 'Loading…'
         : state.kind === 'no-problem'
           ? state.reason
           : 'Get solution';
@@ -331,13 +331,13 @@ function render(): void {
   // Answer — show while streaming too, so the user watches it land.
   if (state.kind === 'answered') {
     els.answerSection.hidden = false;
-    els.answerMeta.textContent = `${state.provider} \u00b7 ${state.latencyMs} ms`;
+    els.answerMeta.textContent = `${state.provider} · ${state.latencyMs} ms`;
     els.answerText.textContent = state.answer;
   } else if (state.kind === 'fetching-answer' && state.answer.length > 0) {
     els.answerSection.hidden = false;
     els.answerMeta.textContent = state.provider
-      ? `${state.provider} \u00b7 streaming\u2026`
-      : 'streaming\u2026';
+      ? `${state.provider} · streaming…`
+      : 'streaming…';
     els.answerText.textContent = state.answer;
   } else {
     els.answerSection.hidden = true;

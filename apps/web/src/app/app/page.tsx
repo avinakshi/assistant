@@ -31,8 +31,8 @@ export default async function DashboardHome() {
   const planLabel = planDisplayName(usage.plan);
   const usageHeader =
     usage.weeklyLimitSeconds === null
-      ? `${planLabel} tier \u00b7 unlimited live minutes`
-      : `${planLabel} tier \u00b7 ${formatMinutes(usage.usedSeconds)} used of ${formatMinutes(usage.weeklyLimitSeconds)} this week`;
+      ? `${planLabel} tier · unlimited live minutes`
+      : `${planLabel} tier · ${formatMinutes(usage.usedSeconds)} used of ${formatMinutes(usage.weeklyLimitSeconds)} this week`;
 
   return (
     <div className="mx-auto max-w-4xl px-6 py-10">
@@ -127,7 +127,7 @@ function UsageCard({ usage }: { usage: Awaited<ReturnType<typeof readUsageSnapsh
     <div className="mt-6 rounded-xl border border-ink-100 bg-white p-5">
       <div className="flex items-center justify-between">
         <div className="text-xs font-semibold uppercase tracking-wider text-ink-500">
-          This week\u2019s live usage
+          This week’s live usage
         </div>
         <Link
           href="/app/billing"
@@ -138,12 +138,12 @@ function UsageCard({ usage }: { usage: Awaited<ReturnType<typeof readUsageSnapsh
       </div>
       {unlimited ? (
         <div className="mt-3 text-sm text-ink-700">
-          You\u2019re on {planDisplayName(usage.plan)}. No weekly cap\u2014 run as many sessions as you need.
+          You’re on {planDisplayName(usage.plan)}. No weekly cap— run as many sessions as you need.
         </div>
       ) : (
         <>
           <div className="mt-3 text-sm text-ink-700">
-            {formatMinutes(usage.usedSeconds)} used \u00b7{' '}
+            {formatMinutes(usage.usedSeconds)} used ·{' '}
             {formatMinutes(usage.remainingSeconds ?? 0)} remaining
           </div>
           <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-ink-50">
