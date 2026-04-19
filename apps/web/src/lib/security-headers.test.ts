@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { NextResponse } from 'next/server';
-import { applySecurityHeaders } from './security-headers';
+import { applySecurityHeaders, buildCspReportOnly } from './security-headers';
 
 describe('applySecurityHeaders', () => {
   it('returns the same response object (mutates in place)', () => {
@@ -36,5 +36,40 @@ describe('applySecurityHeaders', () => {
   it('HSTS includes subdomains', () => {
     const res = applySecurityHeaders(NextResponse.next());
     expect(res.headers.get('strict-transport-security')).toContain('includeSubDomains');
+  });
+
+  it('emits CSP in report-only (not enforce) mode', () => {
+    const res = applySecurityHeaders(NextResponse.next());
+    expect(res.headers.get('content-security-policy-report-only')).toBeTruthy();
+    expect(res.headers.get('content-security-policy')).toBeNull();
+  });
+});
+
+describe('buildCspReportOnly', () => {
+  it('includes the key directives + report-uri', () => {
+    const csp = buildCspReportOnly();
+    expect(csp).toContain("default-src 'self'");
+    expect(csp).toContain('report-uri /api/csp-report');
+    expect(csp).toContain("frame-ancestors 'none'");
+    expect(csp).toContain("object-src 'none'");
+  });
+
+  it('allows Supabase auth + realtime in connect-src', () => {
+    const csp = buildCspReportOnly();
+    expect(csp).toMatch(/connect-src[^;]*https:\/\/\*\.supabase\.co/);
+    expect(csp).toMatch(/connect-src[^;]*wss:\/\/\*\.supabase\.co/);
+  });
+
+  it('keeps form-action scoped to self + Supabase (auth redirects)', () => {
+    const csp = buildCspReportOnly();
+    expect(csp).toMatch(/form-action[^;]*'self'/);
+    expect(csp).toMatch(/form-action[^;]*https:\/\/\*\.supabase\.co/);
+  });
+
+  it('temporarily allows unsafe-inline for Next runtime glue', () => {
+    // This is a known debt item — nonce-based CSP comes in a follow-up. The test pins
+    // the current compromise so nobody silently tightens it without the nonce work.
+    const csp = buildCspReportOnly();
+    expect(csp).toContain("'unsafe-inline'");
   });
 });

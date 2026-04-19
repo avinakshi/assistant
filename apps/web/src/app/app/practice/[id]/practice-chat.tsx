@@ -69,7 +69,28 @@ export function PracticeChat(props: Props) {
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [voiceMode, setVoiceMode] = useState(false);
+  const [showShortcuts, setShowShortcuts] = useState(false);
   const spokenQuestionsRef = useRef<Set<number>>(new Set());
+
+  // Global ? opens the shortcuts overlay; Esc closes. Ignored while the user is typing
+  // in an input / textarea / contenteditable element.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      const target = e.target as HTMLElement | null;
+      const inField =
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        (target?.isContentEditable ?? false);
+      if (e.key === '?' && !inField && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        e.preventDefault();
+        setShowShortcuts((v) => !v);
+      } else if (e.key === 'Escape') {
+        setShowShortcuts(false);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   const turns = useMemo(() => toTurns(props.events), [props.events]);
   const lastTurn = turns[turns.length - 1];
@@ -119,6 +140,43 @@ export function PracticeChat(props: Props) {
 
   return (
     <div className="flex flex-col gap-4">
+      <div className="flex justify-end text-[11px] text-ink-500">
+        <button
+          type="button"
+          onClick={() => setShowShortcuts((v) => !v)}
+          aria-expanded={showShortcuts}
+          aria-controls="shortcuts-popover"
+          className="rounded border border-ink-100 bg-white px-2 py-0.5 hover:bg-ink-50 focus-visible:outline-2 focus-visible:outline-brand-500"
+        >
+          Shortcuts <kbd className="ml-1 rounded bg-ink-50 px-1 font-mono">?</kbd>
+        </button>
+      </div>
+      {showShortcuts && (
+        <div
+          id="shortcuts-popover"
+          role="dialog"
+          aria-label="Keyboard shortcuts"
+          className="rounded-xl border border-ink-100 bg-white p-4 text-xs text-ink-700 shadow-sm"
+        >
+          <div className="font-semibold text-ink-900">Keyboard shortcuts</div>
+          <ul className="mt-2 grid grid-cols-2 gap-x-6 gap-y-1">
+            <ShortcutRow keys={['Ctrl', 'Enter']} label="Submit answer" />
+            <ShortcutRow keys={['Cmd', 'Enter']} label="Submit answer (macOS)" />
+            <ShortcutRow keys={['?']} label="Toggle this help" />
+            <ShortcutRow keys={['Esc']} label="Close this help" />
+          </ul>
+          <div className="mt-3 flex justify-end">
+            <button
+              type="button"
+              onClick={() => setShowShortcuts(false)}
+              className="rounded border border-ink-100 px-2 py-0.5 text-[11px] hover:bg-ink-50"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
       <ol className="flex flex-col gap-5">
         {turns.map((t) => (
           <TurnCard key={t.index} turn={t} />
@@ -182,9 +240,21 @@ export function PracticeChat(props: Props) {
               Voice mode
             </label>
           </div>
+          <label htmlFor="practice-answer" className="sr-only">
+            Your answer
+          </label>
           <textarea
+            id="practice-answer"
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              // Ctrl/Cmd + Enter submits. matches the hint copy below. Shift+Enter is
+              // left as a plain newline.
+              if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !pending) {
+                e.preventDefault();
+                sendAnswer();
+              }
+            }}
             placeholder="Type your answer. Keep it specific — STAR format for behavioral."
             rows={5}
             disabled={pending}
@@ -282,7 +352,9 @@ function FeedbackChip({ feedback }: { feedback: NonNullable<Turn['feedback']> })
 
 function ScorePill({ label, v }: { label: string; v: number | undefined }) {
   const n = typeof v === 'number' ? v : 0;
-  const color = n >= 4 ? 'bg-emerald-50 text-emerald-700' : n >= 2.5 ? 'bg-ink-50 text-ink-700' : 'bg-amber-50 text-amber-800';
+  // emerald-800 on emerald-50 clears WCAG AA (~6.4:1) at the 11px pill size; emerald-700
+  // was ~4.4:1 which is below the 4.5 threshold for small text.
+  const color = n >= 4 ? 'bg-emerald-50 text-emerald-800' : n >= 2.5 ? 'bg-ink-50 text-ink-700' : 'bg-amber-50 text-amber-800';
   return (
     <span className={`rounded px-1.5 py-0.5 ${color}`}>
       {label} {n.toFixed(1)}
@@ -338,5 +410,23 @@ function SummaryCard({ summary }: { summary: ChatSummary }) {
         </div>
       )}
     </div>
+  );
+}
+
+function ShortcutRow({ keys, label }: { keys: readonly string[]; label: string }) {
+  return (
+    <li className="flex items-center justify-between gap-3">
+      <span>{label}</span>
+      <span className="flex gap-1">
+        {keys.map((k, i) => (
+          <kbd
+            key={i}
+            className="rounded border border-ink-100 bg-ink-50 px-1.5 py-0.5 font-mono text-[10px] text-ink-700"
+          >
+            {k}
+          </kbd>
+        ))}
+      </span>
+    </li>
   );
 }

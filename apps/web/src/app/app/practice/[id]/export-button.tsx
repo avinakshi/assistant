@@ -61,6 +61,7 @@ export function ExportButton({ input }: { input: ExportInput }) {
         <textarea
           readOnly
           value={md}
+          aria-label="Practice transcript markdown"
           rows={Math.min(20, md.split('\n').length + 1)}
           className="mt-3 w-full resize-y rounded-md border border-ink-100 bg-ink-50 p-3 font-mono text-xs text-ink-700"
         />

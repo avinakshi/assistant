@@ -127,7 +127,7 @@ export function ApiKeysCard() {
 
       {recentPlaintext && (
         <div className="mt-3 rounded-md border border-emerald-200 bg-emerald-50 p-3">
-          <div className="text-xs font-semibold text-emerald-700">New key created</div>
+          <div className="text-xs font-semibold text-emerald-800">New key created</div>
           <div className="mt-2 flex items-center gap-2">
             <code className="flex-1 select-all overflow-x-auto rounded bg-white px-2 py-1.5 font-mono text-[11px] text-ink-900">
               {recentPlaintext}
@@ -140,14 +140,18 @@ export function ApiKeysCard() {
               {copied ? 'Copied \u2713' : 'Copy'}
             </button>
           </div>
-          <div className="mt-2 text-[11px] text-emerald-700">
+          <div className="mt-2 text-[11px] text-emerald-800">
             Copy now \u2014 this is the only time you\u2019ll see the full key.
           </div>
         </div>
       )}
 
       <div className="mt-4 flex items-center gap-2">
+        <label htmlFor="new-api-key-name" className="sr-only">
+          New API key name
+        </label>
         <input
+          id="new-api-key-name"
           type="text"
           value={newName}
           onChange={(e) => setNewName(e.target.value)}
