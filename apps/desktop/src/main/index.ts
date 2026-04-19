@@ -249,7 +249,15 @@ async function bootstrapWithWindows(): Promise<void> {
       return;
     }
     if (next) {
-      activeWs.startSession({ language: SESSION_LANGUAGE, mode: 'auto', llm: 'auto' });
+      activeWs.startSession({
+        language: SESSION_LANGUAGE,
+        mode: 'auto',
+        llm: 'auto',
+        // Phase 9: persist turns + LLM answers for post-session review. Users can delete
+        // any session from /app/sessions afterward. A future Settings toggle can flip the
+        // default; hardcoded true for now since most users running live mode want review.
+        persistTranscripts: true,
+      });
       logger.info({}, 'listening started');
       broadcastToRenderers(IpcPushChannels.SessionEvent, {
         kind: 'listening',

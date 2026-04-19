@@ -18,7 +18,9 @@ export function OverlayApp() {
   const pushUpdater = useOverlayStore((s) => s.pushUpdater);
   const updater = useOverlayStore((s) => s.updater);
   const sessionEvent = useOverlayStore((s) => s.sessionEvent);
-  const listening = sessionEvent?.kind === 'listening' || sessionEvent?.kind === 'ready';
+  // 'ready' just means the WS handshake succeeded — it does NOT imply the user has
+  // started the session. Only 'listening' flips the overlay into the active state.
+  const listening = sessionEvent?.kind === 'listening';
 
   useEffect(() => {
     const api = window.ic;

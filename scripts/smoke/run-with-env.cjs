@@ -16,7 +16,16 @@ try {
   console.error('no .env found:', e.message);
 }
 
-const [, , cmd, ...args] = process.argv;
+// Optional --cwd <dir> positional override so scripts that need to be launched from a
+// specific workspace directory (e.g. Next dev server) can be. Everything after is the
+// command + args.
+let cwd = process.cwd();
+let rest = process.argv.slice(2);
+if (rest[0] === '--cwd') {
+  cwd = resolve(rest[1]);
+  rest = rest.slice(2);
+}
+const [cmd, ...args] = rest;
 if (!cmd) {
   console.error('usage: node run-with-env.cjs <exe> [...args]');
   process.exit(2);
@@ -33,8 +42,9 @@ const child = useShell
       stdio: 'inherit',
       env,
       windowsHide: false,
+      cwd,
     })
-  : spawn(cmd, args, { stdio: 'inherit', env, windowsHide: false });
+  : spawn(cmd, args, { stdio: 'inherit', env, windowsHide: false, cwd });
 child.on('error', (e) => {
   console.error('spawn failed:', e.message);
   process.exit(1);

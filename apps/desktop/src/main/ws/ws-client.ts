@@ -45,6 +45,8 @@ export interface SessionStartParams {
   mode?: 'auto' | 'behavioral' | 'coding' | 'system_design';
   llm?: 'auto' | 'claude' | 'gpt-5' | 'gpt-4.1' | 'gemini';
   language?: string;
+  /** Phase 9: persist per-turn transcripts + answers for post-session review. */
+  persistTranscripts?: boolean;
 }
 
 const DEFAULT_BACKOFF = [1_000, 2_000, 4_000, 8_000, 16_000, 30_000];
@@ -216,6 +218,9 @@ export class WsClient {
       ...(params.resumeId ? { resumeId: params.resumeId } : {}),
       ...(params.jdId ? { jdId: params.jdId } : {}),
       ...(params.personaId ? { personaId: params.personaId } : {}),
+      ...(params.persistTranscripts !== undefined
+        ? { persistTranscripts: params.persistTranscripts }
+        : {}),
     });
   }
 

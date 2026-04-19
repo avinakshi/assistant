@@ -95,6 +95,12 @@ export class SessionOrchestrator {
   private currentAnswerText = '';
   /** The question text the active answer is responding to. */
   private currentAnswerQuestion = '';
+  /**
+   * Phase 9. When true, the orchestrator writes every transcript.final + answer.done
+   * to session_events so the user can review the session later. Mirrored to
+   * `sessions.persist_transcripts` so the web UI can tell.
+   */
+  private persistTranscripts = false;
 
   constructor(
     private readonly socket: WebSocket,
@@ -153,6 +159,7 @@ export class SessionOrchestrator {
     this.state = 'starting';
     this.language = msg.language;
     this.llmChoice = msg.llm;
+    this.persistTranscripts = msg.persistTranscripts === true;
     this.deps.logger.info(
       { sessionId: this.sessionId, language: msg.language, mode: msg.mode, llm: msg.llm },
       'session starting',
@@ -227,6 +234,7 @@ export class SessionOrchestrator {
             mode: msg.mode,
             language: msg.language,
             llm_choice: msg.llm,
+            persist_transcripts: this.persistTranscripts,
             ...(msg.resumeId ? { resume_id: msg.resumeId } : {}),
             ...(msg.jdId ? { jd_id: msg.jdId } : {}),
             ...(msg.personaId ? { persona_id: msg.personaId } : {}),
@@ -284,6 +292,7 @@ export class SessionOrchestrator {
       ts,
       isQuestion: classification.isQuestion,
     });
+    this.persistEvent('transcript', { text, ts, isQuestion: classification.isQuestion });
     if (classification.isQuestion && this.deps.llmRouter) {
       void this.fireAnswer(text, classification.hint ?? 'behavioral');
     }
@@ -380,6 +389,15 @@ export class SessionOrchestrator {
             question: this.currentAnswerQuestion,
             answer: this.currentAnswerText,
           };
+          this.persistEvent('answer', {
+            answerId,
+            provider,
+            mode: hint,
+            question: this.currentAnswerQuestion,
+            answer: this.currentAnswerText,
+            latencyMs: (answer.firstTokenAt ?? Date.now()) - answer.startedAt,
+            chars: answer.totalChars,
+          });
         }
       }
     } catch (err) {
@@ -472,6 +490,12 @@ export class SessionOrchestrator {
 
       this.codingProblem = problem;
       this.send({ type: 'ocr.result', problemId, parsed: problem });
+      this.persistEvent('ocr', {
+        problemId,
+        site: problem.site,
+        title: problem.title ?? null,
+        difficulty: problem.difficulty ?? null,
+      });
 
       // The screenshot IS the candidate's request: "solve this problem". Fire an immediate
       // coding answer rather than waiting for a separate spoken question. This matches the
@@ -502,6 +526,28 @@ export class SessionOrchestrator {
   private send(msg: ServerMessage): void {
     if (this.socket.readyState !== this.socket.OPEN) return;
     this.socket.send(encodeServerMessage(msg));
+  }
+
+  /**
+   * Append a row to `session_events` when transcript persistence is enabled. Fire and
+   * forget — DB hiccups must never delay the live flow. We swallow errors after logging
+   * because otherwise a migration lag would force-close the session.
+   */
+  private persistEvent(kind: string, payload: Record<string, unknown>): void {
+    if (!this.persistTranscripts) return;
+    if (!this.deps.supabase || !this.dbSessionId) return;
+    const sessionId = this.dbSessionId;
+    void this.deps.supabase
+      .from('session_events')
+      .insert({ session_id: sessionId, kind, payload })
+      .then((res) => {
+        if (res.error) {
+          this.deps.logger.warn(
+            { err: res.error.message, kind, sessionId },
+            'session_events insert failed',
+          );
+        }
+      });
   }
 
   private async handleClose(code: number, reason: Buffer): Promise<void> {

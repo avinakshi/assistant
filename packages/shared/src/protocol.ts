@@ -19,6 +19,13 @@ export const ClientMessageSchema = z.discriminatedUnion('type', [
     mode: z.enum(['auto', 'behavioral', 'coding', 'system_design']).default('auto'),
     llm: z.enum(['auto', 'claude', 'gpt-5', 'gpt-4.1', 'gemini']).default('auto'),
     language: z.string().min(2).max(10).default('en'),
+    /**
+     * When true, the orchestrator writes every transcript.final + answer.done event to
+     * the `session_events` table so the user can review the interview afterwards in
+     * /app/sessions/[id]. When false (or absent), only the top-level `sessions` row is
+     * written. Default false — matches the schema default (privacy-preserving).
+     */
+    persistTranscripts: z.boolean().optional(),
   }),
   z.object({ type: z.literal('session.stop') }),
   z.object({ type: z.literal('hint'), text: z.string().min(1).max(2000) }),
