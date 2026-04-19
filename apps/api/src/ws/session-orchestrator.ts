@@ -605,6 +605,24 @@ export class SessionOrchestrator {
           'sessions update failed',
         );
       }
+
+      // Phase 9b: generate a post-session recap if persistence was on. Fire-and-forget;
+      // never block socket close. Gemini call + summary insert happens in the background.
+      if (this.persistTranscripts && this.deps.userId) {
+        const { generateLiveRecap } = await import('../lib/live-recap');
+        void generateLiveRecap({
+          supabase: this.deps.supabase,
+          sessionId: this.dbSessionId,
+          userId: this.deps.userId,
+          // The session doesn't hold a fixed mode; the orchestrator classifies each
+          // question individually. Omitted so the prompt stays generic.
+        }).catch((err) => {
+          this.deps.logger.warn(
+            { err: String(err), sessionId: this.dbSessionId },
+            'live recap failed',
+          );
+        });
+      }
     }
 
     if (this.socket.readyState === this.socket.OPEN) {

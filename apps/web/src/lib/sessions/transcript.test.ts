@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { exportTranscriptMarkdown } from './transcript';
+import { exportTranscriptMarkdown, exportLiveTranscriptMarkdown } from './transcript';
 
 describe('exportTranscriptMarkdown', () => {
   const base = {
@@ -78,5 +78,93 @@ describe('exportTranscriptMarkdown', () => {
       turns: [],
     });
     expect(md).toContain('# Practice session — System design');
+  });
+});
+
+describe('exportLiveTranscriptMarkdown', () => {
+  const liveBase = {
+    mode: 'auto',
+    startedAt: new Date('2026-04-19T10:00:00Z'),
+    events: [],
+  };
+
+  it('renders a header with mode + start time', () => {
+    const md = exportLiveTranscriptMarkdown(liveBase);
+    expect(md).toContain('# Live interview — auto');
+    expect(md).toContain('_2026-04-19T10:00:00.000Z_');
+  });
+
+  it('pairs a question transcript with the next answer event', () => {
+    const md = exportLiveTranscriptMarkdown({
+      ...liveBase,
+      events: [
+        {
+          kind: 'transcript',
+          payload: { text: 'Tell me about a conflict.', isQuestion: true },
+          ts: '2026-04-19T10:00:01Z',
+        },
+        {
+          kind: 'answer',
+          payload: { answer: 'I disagreed with my manager...' },
+          ts: '2026-04-19T10:00:02Z',
+        },
+      ],
+    });
+    expect(md).toMatch(/\*\*Q\.\*\* Tell me about a conflict\./);
+    expect(md).toMatch(/\*\*AI suggestion\.\*\* I disagreed with my manager\.\.\./);
+  });
+
+  it('renders non-question transcripts as blockquotes', () => {
+    const md = exportLiveTranscriptMarkdown({
+      ...liveBase,
+      events: [
+        {
+          kind: 'transcript',
+          payload: { text: 'Thanks for joining today.', isQuestion: false },
+          ts: '2026-04-19T10:00:01Z',
+        },
+      ],
+    });
+    expect(md).toContain('> Thanks for joining today.');
+  });
+
+  it('emits screenshot markers with title + site', () => {
+    const md = exportLiveTranscriptMarkdown({
+      ...liveBase,
+      events: [
+        {
+          kind: 'ocr',
+          payload: { title: 'Two Sum', site: 'leetcode' },
+          ts: '2026-04-19T10:00:01Z',
+        },
+      ],
+    });
+    expect(md).toContain('*[screenshot] Two Sum — leetcode*');
+  });
+
+  it('emits a topics-covered section when supplied', () => {
+    const md = exportLiveTranscriptMarkdown({
+      ...liveBase,
+      topics: ['leadership', 'system design'],
+    });
+    expect(md).toContain('## Topics covered');
+    expect(md).toContain('- leadership');
+    expect(md).toContain('- system design');
+  });
+
+  it('does not cross-pair questions — Q1 without A before Q2 stays unpaired', () => {
+    const md = exportLiveTranscriptMarkdown({
+      ...liveBase,
+      events: [
+        { kind: 'transcript', payload: { text: 'Q1?', isQuestion: true }, ts: 'a' },
+        { kind: 'transcript', payload: { text: 'Q2?', isQuestion: true }, ts: 'b' },
+        { kind: 'answer', payload: { answer: 'A for Q2' }, ts: 'c' },
+      ],
+    });
+    // Both questions appear; AI suggestion shows up once (after Q2).
+    const aiSuggestionMatches = md.match(/\*\*AI suggestion\.\*\*/g) ?? [];
+    expect(aiSuggestionMatches.length).toBe(1);
+    expect(md).toContain('Q1?');
+    expect(md).toContain('Q2?');
   });
 });

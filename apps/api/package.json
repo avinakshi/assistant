@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@fastify/websocket": "^11.0.0",
+    "@google/generative-ai": "^0.21.0",
     "@repo/llm-router": "workspace:*",
     "@repo/ocr": "workspace:*",
     "@repo/prompts": "workspace:*",

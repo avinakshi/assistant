@@ -12,6 +12,13 @@ export {
   type BuildTurnPromptInput,
   type BuildFinalizePromptInput,
 } from './interviewer';
+export {
+  buildLiveRecapPrompt,
+  parseLiveRecapResponse,
+  type LiveRecap,
+  type LiveRecapEvent,
+  type BuildLiveRecapInput,
+} from './live-recap';
 
 export type PromptPackName = 'behavioral' | 'coding' | 'system-design';
 

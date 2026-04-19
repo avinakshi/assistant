@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { LiveSessionTimeline, type TimelineEvent } from './timeline';
+import { CopyLiveButton } from './copy-live-button';
 import { modeLabel } from '@/lib/sessions/aggregate';
 
 export const dynamic = 'force-dynamic';
@@ -31,7 +32,7 @@ export default async function SessionDetailPage({
   const { id } = await params;
   const supabase = await createClient();
 
-  const [{ data: session }, { data: events }] = await Promise.all([
+  const [{ data: session }, { data: events }, { data: summary }] = await Promise.all([
     supabase
       .from('sessions')
       .select('id, kind, mode, started_at, ended_at, duration_s, persist_transcripts, llm_choice')
@@ -42,6 +43,11 @@ export default async function SessionDetailPage({
       .select('kind, payload, ts')
       .eq('session_id', id)
       .order('ts', { ascending: true }),
+    supabase
+      .from('session_summaries')
+      .select('highlights, improvements, created_at')
+      .eq('session_id', id)
+      .maybeSingle(),
   ]);
 
   if (!session) notFound();
@@ -67,6 +73,18 @@ export default async function SessionDetailPage({
     payload: e.payload,
     ts: e.ts,
   }));
+  const recapHighlights = (summary as { highlights?: unknown[] } | null)?.highlights ?? [];
+  const recapImprovements = (summary as { improvements?: unknown[] } | null)?.improvements ?? [];
+  const topics: string[] = [];
+  const nonTopicHighlights: string[] = [];
+  for (const h of recapHighlights) {
+    if (typeof h !== 'string') continue;
+    if (h.startsWith('Topic: ')) topics.push(h.slice('Topic: '.length));
+    else nonTopicHighlights.push(h);
+  }
+  const improvements = (recapImprovements as unknown[]).filter(
+    (x): x is string => typeof x === 'string',
+  );
 
   const durationLine = s.duration_s
     ? `${Math.max(1, Math.round(s.duration_s / 60))} min`
@@ -90,6 +108,50 @@ export default async function SessionDetailPage({
         </Link>
       </div>
 
+      {(topics.length > 0 || nonTopicHighlights.length > 0 || improvements.length > 0) && (
+        <section className="mb-6 rounded-xl border border-brand-100 bg-white p-5">
+          <div className="text-xs font-semibold uppercase tracking-wider text-ink-500">
+            Session recap
+          </div>
+          {topics.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {topics.map((t, i) => (
+                <span
+                  key={i}
+                  className="rounded bg-brand-50 px-2 py-0.5 text-[11px] font-medium text-brand-700"
+                >
+                  {t}
+                </span>
+              ))}
+            </div>
+          )}
+          {nonTopicHighlights.length > 0 && (
+            <div className="mt-4">
+              <div className="text-xs font-semibold uppercase tracking-wider text-emerald-700">
+                Highlights
+              </div>
+              <ul className="mt-1 list-disc pl-5 text-sm text-ink-700">
+                {nonTopicHighlights.map((h, i) => (
+                  <li key={i}>{h}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {improvements.length > 0 && (
+            <div className="mt-4">
+              <div className="text-xs font-semibold uppercase tracking-wider text-amber-700">
+                Prep for next time
+              </div>
+              <ul className="mt-1 list-disc pl-5 text-sm text-ink-700">
+                {improvements.map((imp, i) => (
+                  <li key={i}>{imp}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </section>
+      )}
+
       {!s.persist_transcripts && timelineEvents.length === 0 ? (
         <div className="rounded-xl border border-ink-100 bg-white p-6 text-sm text-ink-700">
           <div className="font-medium text-ink-900">No transcript saved for this session.</div>
@@ -103,7 +165,21 @@ export default async function SessionDetailPage({
           No events recorded yet. {s.ended_at ? 'The session ended silently.' : 'Session is still running.'}
         </div>
       ) : (
-        <LiveSessionTimeline events={timelineEvents} />
+        <>
+          <LiveSessionTimeline events={timelineEvents} />
+          <CopyLiveButton
+            input={{
+              mode: s.mode,
+              startedAt: s.started_at,
+              ...(s.ended_at ? { endedAt: s.ended_at } : {}),
+              llmChoice: s.llm_choice,
+              events: timelineEvents,
+              ...(topics.length > 0 ? { topics } : {}),
+              ...(nonTopicHighlights.length > 0 ? { highlights: nonTopicHighlights } : {}),
+              ...(improvements.length > 0 ? { improvements } : {}),
+            }}
+          />
+        </>
       )}
     </div>
   );
